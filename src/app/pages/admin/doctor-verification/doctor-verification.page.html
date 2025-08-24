@@ -1,0 +1,249 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Doctor Verification</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  
+  <!-- Search and Filter Section -->
+  <div class="filter-section">
+    <ion-searchbar 
+      [(ngModel)]="searchTerm"
+      (ionInput)="onSearchChange($event)"
+      placeholder="Search doctors by name, email, or specialization"
+      show-clear-button="focus">
+    </ion-searchbar>
+    
+    <ion-segment 
+      [(ngModel)]="selectedStatus" 
+      (ionChange)="onStatusChange($event)"
+      class="status-segment">
+      <ion-segment-button value="pending">
+        <ion-icon name="time-outline"></ion-icon>
+        <ion-label>Pending</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="approved">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <ion-label>Approved</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="rejected">
+        <ion-icon name="close-circle-outline"></ion-icon>
+        <ion-label>Rejected</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="isLoading" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading doctors...</p>
+  </div>
+
+  <!-- Doctors List -->
+  <div *ngIf="!isLoading" class="doctors-list">
+    <ion-card *ngFor="let doctor of filteredDoctors" class="doctor-card">
+      <ion-card-content>
+        <div class="doctor-header">
+          <div class="doctor-info">
+            <h3>Dr. {{ doctor.name }}</h3>
+            <p class="email">{{ doctor.email }}</p>
+            <p class="specialization">
+              <ion-icon name="medical-outline"></ion-icon>
+              {{ doctor.specialization || 'General Practice' }}
+            </p>
+          </div>
+          <ion-badge [color]="getStatusColor(doctor.kycStatus || 'pending')" class="status-badge">
+            <ion-icon [name]="getStatusIcon(doctor.kycStatus || 'pending')"></ion-icon>
+            {{ (doctor.kycStatus || 'pending') | titlecase }}
+          </ion-badge>
+        </div>
+
+        <div class="doctor-details">
+          <ion-grid>
+            <ion-row>
+              <ion-col size="6">
+                <div class="detail-item">
+                  <ion-icon name="school-outline" color="primary"></ion-icon>
+                  <span>{{ doctor.qualification || 'Not provided' }}</span>
+                </div>
+              </ion-col>
+              <ion-col size="6">
+                <div class="detail-item">
+                  <ion-icon name="business-outline" color="primary"></ion-icon>
+                  <span>{{ doctor.experience || 0 }} years exp.</span>
+                </div>
+              </ion-col>
+            </ion-row>
+            <ion-row>
+              <ion-col size="6">
+                <div class="detail-item">
+                  <ion-icon name="card-outline" color="primary"></ion-icon>
+                  <span>₹{{ doctor.consultationFee || 500 }} fee</span>
+                </div>
+              </ion-col>
+              <ion-col size="6">
+                <div class="detail-item">
+                  <ion-icon name="time-outline" color="primary"></ion-icon>
+                  <span>{{ doctor.createdAt | date:'short' }}</span>
+                </div>
+              </ion-col>
+            </ion-row>
+          </ion-grid>
+        </div>
+
+        <div class="action-buttons">
+          <ion-button 
+            fill="outline" 
+            size="small" 
+            (click)="viewDoctorDetails(doctor)"
+            class="view-btn">
+            <ion-icon name="eye-outline" slot="start"></ion-icon>
+            View Details
+          </ion-button>
+          
+          <div class="verification-buttons" *ngIf="doctor.kycStatus === 'pending'">
+            <ion-button 
+              color="success" 
+              size="small" 
+              (click)="approveDoctor(doctor)"
+              class="approve-btn">
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Approve
+            </ion-button>
+            <ion-button 
+              color="danger" 
+              size="small" 
+              (click)="rejectDoctor(doctor)"
+              class="reject-btn">
+              <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+              Reject
+            </ion-button>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Empty State -->
+    <div *ngIf="filteredDoctors.length === 0" class="empty-state">
+      <ion-icon name="medical-outline" size="large"></ion-icon>
+      <h3>No doctors found</h3>
+      <p>No doctors match your current filter criteria.</p>
+    </div>
+  </div>
+
+  <!-- Doctor Details Modal -->
+  <ion-modal [isOpen]="isModalOpen" (didDismiss)="closeModal()">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Doctor Details</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeModal()">
+              <ion-icon name="close"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      
+      <ion-content class="ion-padding" *ngIf="selectedDoctor">
+        <div class="modal-content">
+          <div class="doctor-profile">
+            <h2>Dr. {{ selectedDoctor.name }}</h2>
+            <ion-badge [color]="getStatusColor(selectedDoctor.kycStatus || 'pending')">
+              {{ (selectedDoctor.kycStatus || 'pending') | titlecase }}
+            </ion-badge>
+          </div>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>Personal Information</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <ion-item lines="none">
+                <ion-icon name="mail-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Email</h3>
+                  <p>{{ selectedDoctor.email }}</p>
+                </ion-label>
+              </ion-item>
+              <ion-item lines="none">
+                <ion-icon name="call-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Phone</h3>
+                  <p>{{ selectedDoctor.phone }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-card-content>
+          </ion-card>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>Professional Information</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <ion-item lines="none">
+                <ion-icon name="medical-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Specialization</h3>
+                  <p>{{ selectedDoctor.specialization || 'Not provided' }}</p>
+                </ion-label>
+              </ion-item>
+              <ion-item lines="none">
+                <ion-icon name="school-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Qualification</h3>
+                  <p>{{ selectedDoctor.qualification || 'Not provided' }}</p>
+                </ion-label>
+              </ion-item>
+              <ion-item lines="none">
+                <ion-icon name="business-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Experience</h3>
+                  <p>{{ selectedDoctor.experience || 0 }} years</p>
+                </ion-label>
+              </ion-item>
+              <ion-item lines="none">
+                <ion-icon name="location-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Clinic Address</h3>
+                  <p>{{ selectedDoctor.clinicAddress || 'Not provided' }}</p>
+                </ion-label>
+              </ion-item>
+              <ion-item lines="none">
+                <ion-icon name="card-outline" slot="start"></ion-icon>
+                <ion-label>
+                  <h3>Consultation Fee</h3>
+                  <p>₹{{ selectedDoctor.consultationFee || 500 }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-card-content>
+          </ion-card>
+
+          <!-- Verification Actions -->
+          <div class="modal-actions" *ngIf="selectedDoctor.kycStatus === 'pending'">
+            <ion-button 
+              expand="block" 
+              color="success" 
+              (click)="approveDoctor(selectedDoctor)">
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Approve Doctor
+            </ion-button>
+            <ion-button 
+              expand="block" 
+              color="danger" 
+              fill="outline"
+              (click)="rejectDoctor(selectedDoctor)">
+              <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+              Reject Doctor
+            </ion-button>
+          </div>
+        </div>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+</ion-content>

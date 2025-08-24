@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1041888734011",
+    "firebase_url": "https://doctorconnect-f0aa0-default-rtdb.firebaseio.com",
+    "project_id": "doctorconnect-f0aa0",
+    "storage_bucket": "doctorconnect-f0aa0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1041888734011:android:d7f1080ce67e1057ce251e",
+        "android_client_info": {
+          "package_name": "com.Js.DoctorConnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPKHY7d-Ag0OYa3R0jqSoWciRcrcwYgy8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

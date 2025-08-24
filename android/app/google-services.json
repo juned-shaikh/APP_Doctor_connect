@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1041888734011",
+    "firebase_url": "https://doctorconnect-f0aa0-default-rtdb.firebaseio.com",
+    "project_id": "doctorconnect-f0aa0",
+    "storage_bucket": "doctorconnect-f0aa0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1041888734011:android:d7f1080ce67e1057ce251e",
+        "android_client_info": {
+          "package_name": "com.Js.DoctorConnect"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1041888734011-p2e1l2if9dkhvmhm9122oumlnprpmrk5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.Js.DoctorConnect",
+            "certificate_hash": "bf15395a30969e8fdee9207d3a1e20e1a3e23d95"
+          }
+        },
+        {
+          "client_id": "1041888734011-qdvds4r3h9rt9i7i2qepalbfqv2i2smb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPKHY7d-Ag0OYa3R0jqSoWciRcrcwYgy8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1041888734011-bfa29q2cj2t7v7d34s9ah1o37ccumr64.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

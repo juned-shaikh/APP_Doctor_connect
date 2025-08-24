@@ -1,0 +1,145 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>User Management</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="user-management-container">
+    <!-- Search and Filter Section -->
+    <div class="search-filter-section">
+      <ion-searchbar 
+        [(ngModel)]="searchTerm"
+        (ionInput)="onSearchChange($event)"
+        placeholder="Search users by name, email, or phone"
+        show-clear-button="focus">
+      </ion-searchbar>
+      
+      <ion-segment 
+        [(ngModel)]="selectedRole" 
+        (ionChange)="onRoleChange($event)"
+        class="role-filter">
+        <ion-segment-button value="all">
+          <ion-label>All Users</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="patient">
+          <ion-label>Patients</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="doctor">
+          <ion-label>Doctors</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="admin">
+          <ion-label>Admins</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="loading-container">
+      <ion-spinner name="circular"></ion-spinner>
+      <p>Loading users...</p>
+    </div>
+
+    <!-- Users List -->
+    <div *ngIf="!isLoading" class="users-list">
+      <ion-card *ngFor="let user of filteredUsers" class="user-card">
+        <ion-card-header>
+          <ion-card-title>
+            <div class="user-header">
+              <div class="user-info">
+                <ion-icon [name]="getRoleIcon(user.role)"></ion-icon>
+                <span>{{ user.name }}</span>
+              </div>
+              <div class="user-badges">
+                <ion-badge [color]="getRoleColor(user.role)">
+                  {{ user.role | titlecase }}
+                </ion-badge>
+                <ion-badge [color]="getStatusColor(user.isActive)">
+                  {{ user.isActive ? 'Active' : 'Inactive' }}
+                </ion-badge>
+              </div>
+            </div>
+          </ion-card-title>
+        </ion-card-header>
+        
+        <ion-card-content>
+          <ion-grid>
+            <ion-row>
+              <ion-col size="12" size-md="6">
+                <ion-item lines="none" class="user-detail">
+                  <ion-icon name="mail-outline" slot="start"></ion-icon>
+                  <ion-label>
+                    <h3>Email</h3>
+                    <p>{{ user.email }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-col>
+              
+              <ion-col size="12" size-md="6" *ngIf="user.phone">
+                <ion-item lines="none" class="user-detail">
+                  <ion-icon name="call-outline" slot="start"></ion-icon>
+                  <ion-label>
+                    <h3>Phone</h3>
+                    <p>{{ user.phone }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-col>
+              
+              <ion-col size="12" size-md="6" *ngIf="user.role === 'doctor'">
+                <ion-item lines="none" class="user-detail">
+                  <ion-icon name="school-outline" slot="start"></ion-icon>
+                  <ion-label>
+                    <h3>Specialization</h3>
+                    <p>{{ user.specialization || 'Not specified' }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-col>
+              
+              <ion-col size="12" size-md="6" *ngIf="user.role === 'doctor'">
+                <ion-item lines="none" class="user-detail">
+                  <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                  <ion-label>
+                    <h3>KYC Status</h3>
+                    <p>{{ user.kycStatus || 'Pending' | titlecase }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-col>
+              
+              <ion-col size="12">
+                <ion-item lines="none" class="user-detail">
+                  <ion-icon name="calendar-outline" slot="start"></ion-icon>
+                  <ion-label>
+                    <h3>Joined</h3>
+                    <p>{{ user.createdAt | date:'mediumDate' }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-col>
+            </ion-row>
+          </ion-grid>
+          
+          <!-- Action Buttons -->
+          <div class="action-buttons">
+            <ion-button 
+              fill="outline" 
+              size="small"
+              [color]="user.isActive ? 'danger' : 'success'"
+              (click)="toggleUserStatus(user)">
+              <ion-icon [name]="user.isActive ? 'pause-outline' : 'play-outline'" slot="start"></ion-icon>
+              {{ user.isActive ? 'Deactivate' : 'Activate' }}
+            </ion-button>
+          </div>
+        </ion-card-content>
+      </ion-card>
+      
+      <!-- Empty State -->
+      <div *ngIf="filteredUsers.length === 0" class="empty-state">
+        <ion-icon name="people-outline"></ion-icon>
+        <h3>No users found</h3>
+        <p>Try adjusting your search or filter criteria</p>
+      </div>
+    </div>
+  </div>
+</ion-content>

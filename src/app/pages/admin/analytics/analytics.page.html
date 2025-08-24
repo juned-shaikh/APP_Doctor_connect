@@ -1,0 +1,163 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Analytics & Reports</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="analytics-container">
+    <!-- Period Filter -->
+    <div class="period-filter">
+      <ion-segment 
+        [(ngModel)]="selectedPeriod" 
+        (ionChange)="onPeriodChange($event)"
+        class="period-segment">
+        <ion-segment-button value="week">
+          <ion-label>This Week</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="month">
+          <ion-label>This Month</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="year">
+          <ion-label>This Year</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="loading-container">
+      <ion-spinner name="circular"></ion-spinner>
+      <p>Loading analytics...</p>
+    </div>
+
+    <div *ngIf="!isLoading">
+      <!-- Key Metrics -->
+      <div class="metrics-section">
+        <h2>Key Metrics</h2>
+        <ion-grid>
+          <ion-row>
+            <ion-col size="12" size-md="6" size-lg="3">
+              <ion-card class="metric-card">
+                <ion-card-content>
+                  <div class="metric-header">
+                    <ion-icon name="people-outline" color="primary"></ion-icon>
+                    <div class="growth-indicator">
+                      <ion-icon [name]="getGrowthIcon(growthStats.usersGrowth)" [color]="getGrowthColor(growthStats.usersGrowth)"></ion-icon>
+                      <span [style.color]="getGrowthColor(growthStats.usersGrowth) === 'success' ? 'var(--ion-color-success)' : 'var(--ion-color-danger)'">
+                        {{ growthStats.usersGrowth }}%
+                      </span>
+                    </div>
+                  </div>
+                  <h3>{{ totalStats.users }}</h3>
+                  <p>Total Users</p>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+            
+            <ion-col size="12" size-md="6" size-lg="3">
+              <ion-card class="metric-card">
+                <ion-card-content>
+                  <div class="metric-header">
+                    <ion-icon name="medical-outline" color="success"></ion-icon>
+                    <div class="growth-indicator">
+                      <ion-icon [name]="getGrowthIcon(growthStats.doctorsGrowth)" [color]="getGrowthColor(growthStats.doctorsGrowth)"></ion-icon>
+                      <span [style.color]="getGrowthColor(growthStats.doctorsGrowth) === 'success' ? 'var(--ion-color-success)' : 'var(--ion-color-danger)'">
+                        {{ growthStats.doctorsGrowth }}%
+                      </span>
+                    </div>
+                  </div>
+                  <h3>{{ totalStats.doctors }}</h3>
+                  <p>Active Doctors</p>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+            
+            <ion-col size="12" size-md="6" size-lg="3">
+              <ion-card class="metric-card">
+                <ion-card-content>
+                  <div class="metric-header">
+                    <ion-icon name="calendar-outline" color="warning"></ion-icon>
+                    <div class="growth-indicator">
+                      <ion-icon [name]="getGrowthIcon(growthStats.appointmentsGrowth)" [color]="getGrowthColor(growthStats.appointmentsGrowth)"></ion-icon>
+                      <span [style.color]="getGrowthColor(growthStats.appointmentsGrowth) === 'success' ? 'var(--ion-color-success)' : 'var(--ion-color-danger)'">
+                        {{ growthStats.appointmentsGrowth }}%
+                      </span>
+                    </div>
+                  </div>
+                  <h3>{{ totalStats.appointments }}</h3>
+                  <p>Total Appointments</p>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+            
+            <ion-col size="12" size-md="6" size-lg="3">
+              <ion-card class="metric-card">
+                <ion-card-content>
+                  <div class="metric-header">
+                    <ion-icon name="card-outline" color="tertiary"></ion-icon>
+                    <div class="growth-indicator">
+                      <ion-icon [name]="getGrowthIcon(growthStats.revenueGrowth)" [color]="getGrowthColor(growthStats.revenueGrowth)"></ion-icon>
+                      <span [style.color]="getGrowthColor(growthStats.revenueGrowth) === 'success' ? 'var(--ion-color-success)' : 'var(--ion-color-danger)'">
+                        {{ growthStats.revenueGrowth }}%
+                      </span>
+                    </div>
+                  </div>
+                  <h3>₹{{ totalStats.revenue | number:'1.0-0' }}</h3>
+                  <p>Total Revenue</p>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+      </div>
+
+      <!-- Appointment Status -->
+      <div class="appointment-status-section">
+        <h2>Appointment Status</h2>
+        <ion-grid>
+          <ion-row>
+            <ion-col size="12" size-md="6" size-lg="3" *ngFor="let status of ['pending', 'confirmed', 'completed', 'cancelled']">
+              <ion-card class="status-card">
+                <ion-card-content>
+                  <div class="status-header">
+                    <ion-badge [color]="getAppointmentStatusColor(status)">
+                      {{ status | titlecase }}
+                    </ion-badge>
+                  </div>
+                  <h3>{{ appointmentStats[status] }}</h3>
+                  <p>{{ status | titlecase }} Appointments</p>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+      </div>
+
+      <!-- Top Specializations -->
+      <div class="specializations-section">
+        <h2>Top Specializations</h2>
+        <ion-card>
+          <ion-card-content>
+            <div class="specialization-list">
+              <div *ngFor="let spec of topSpecializations" class="specialization-item">
+                <div class="spec-info">
+                  <h4>{{ spec.name }}</h4>
+                  <p>{{ spec.count }} appointments</p>
+                </div>
+                <div class="spec-stats">
+                  <span class="percentage">{{ spec.percentage }}%</span>
+                  <div class="progress-bar">
+                    <div class="progress-fill" [style.width.%]="spec.percentage"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </div>
+    </div>
+  </div>
+</ion-content>

@@ -1,2 +1,265 @@
 // For information on how to create your own theme, please see:
 // http://ionicframework.com/docs/theming/
+
+// Custom Green Theme Variables
+:root {
+  // Primary green gradient colors
+  --ion-color-primary: #28a745;
+  --ion-color-primary-rgb: 40, 167, 69;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #238a3e;
+  --ion-color-primary-tint: #3eb058;
+
+  // Secondary green color
+  --ion-color-secondary: #20c997;
+  --ion-color-secondary-rgb: 32, 201, 151;
+  --ion-color-secondary-contrast: #ffffff;
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: #1cb085;
+  --ion-color-secondary-tint: #36cea1;
+
+  // Success color (matching primary)
+  --ion-color-success: #28a745;
+  --ion-color-success-rgb: 40, 167, 69;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #238a3e;
+  --ion-color-success-tint: #3eb058;
+
+  // Warning color (complementary orange)
+  --ion-color-warning: #ffc107;
+  --ion-color-warning-rgb: 255, 193, 7;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #e0a800;
+  --ion-color-warning-tint: #ffca22;
+
+  // Danger color (complementary red)
+  --ion-color-danger: #dc3545;
+  --ion-color-danger-rgb: 220, 53, 69;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #c02e3a;
+  --ion-color-danger-tint: #e04e5b;
+
+  // Light colors (white based)
+  --ion-color-light: #ffffff;
+  --ion-color-light-rgb: 255, 255, 255;
+  --ion-color-light-contrast: #28a745;
+  --ion-color-light-contrast-rgb: 40, 167, 69;
+  --ion-color-light-shade: #e6e6e6;
+  --ion-color-light-tint: #ffffff;
+
+  // Medium colors (light gray)
+  --ion-color-medium: #92949c;
+  --ion-color-medium-rgb: 146, 148, 156;
+  --ion-color-medium-contrast: #ffffff;
+  --ion-color-medium-contrast-rgb: 255, 255, 255;
+  --ion-color-medium-shade: #808289;
+  --ion-color-medium-tint: #9d9fa6;
+
+  // Dark colors
+  --ion-color-dark: #222428;
+  --ion-color-dark-rgb: 34, 36, 40;
+  --ion-color-dark-contrast: #ffffff;
+  --ion-color-dark-contrast-rgb: 255, 255, 255;
+  --ion-color-dark-shade: #1e2023;
+  --ion-color-dark-tint: #383a3e;
+
+  // Background colors
+  --ion-background-color: #ffffff;
+  --ion-background-color-rgb: 255, 255, 255;
+  
+  // Text colors
+  --ion-text-color: #000000;
+  --ion-text-color-rgb: 0, 0, 0;
+  
+  // Toolbar colors
+  --ion-toolbar-background: linear-gradient(135deg, #28a745, #20c997);
+  --ion-toolbar-color: #ffffff;
+  
+  // Tab bar colors
+  --ion-tab-bar-background: #ffffff;
+  --ion-tab-bar-color: #28a745;
+  --ion-tab-bar-color-selected: #20c997;
+  
+  // Item colors
+  --ion-item-background: #ffffff;
+  --ion-item-color: #000000;
+  
+  // Card colors
+  --ion-card-background: #ffffff;
+  --ion-card-color: #000000;
+}
+
+// Custom gradient backgrounds
+.gradient-background {
+  background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+}
+
+.gradient-card {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
+  border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+// Header styling
+ion-header ion-toolbar {
+  --background: linear-gradient(135deg, #28a745, #20c997);
+  --color: #ffffff;
+}
+
+// Button styling
+ion-button {
+  --background: linear-gradient(135deg, #28a745, #20c997);
+  --color: #ffffff;
+  --border-radius: 8px;
+}
+
+ion-button.button-outline {
+  --border-color: #28a745;
+  --color: #28a745;
+  --background: transparent;
+}
+
+// Chip styling
+ion-chip {
+  --background: rgba(40, 167, 69, 0.1);
+  --color: #28a745;
+}
+
+// Segment styling
+ion-segment {
+  --background: rgba(40, 167, 69, 0.1);
+}
+
+ion-segment-button {
+  --color: #28a745;
+  --color-checked: #ffffff;
+  --background-checked: linear-gradient(135deg, #28a745, #20c997);
+  --border-radius: 6px;
+}
+
+// FAB styling
+ion-fab-button {
+  --background: linear-gradient(135deg, #28a745, #20c997);
+  --color: #ffffff;
+}
+
+// Badge styling
+ion-badge {
+  --background: #28a745;
+  --color: #ffffff;
+}
+
+// Searchbar styling
+ion-searchbar {
+  --background: #ffffff;
+  --color: #000000;
+  --placeholder-color: #666666;
+  --icon-color: #28a745;
+  --clear-button-color: #28a745;
+}
+
+// Progress bar styling
+ion-progress-bar {
+  --progress-background: linear-gradient(135deg, #28a745, #20c997);
+  --background: rgba(40, 167, 69, 0.2);
+}
+
+// Range styling
+ion-range {
+  --bar-background: rgba(40, 167, 69, 0.2);
+  --bar-background-active: linear-gradient(135deg, #28a745, #20c997);
+  --knob-background: #28a745;
+}
+
+// Toggle styling
+ion-toggle {
+  --background: rgba(40, 167, 69, 0.2);
+  --background-checked: linear-gradient(135deg, #28a745, #20c997);
+  --handle-background: #ffffff;
+  --handle-background-checked: #ffffff;
+}
+
+// Checkbox styling
+ion-checkbox {
+  --background: #ffffff;
+  --background-checked: linear-gradient(135deg, #28a745, #20c997);
+  --border-color: #28a745;
+  --border-color-checked: #28a745;
+  --checkmark-color: #ffffff;
+}
+
+// Radio styling
+ion-radio {
+  --color: #ffffff;
+  --color-checked: #ffffff;
+  --border-color: #28a745;
+  --border-color-checked: #28a745;
+}
+
+// Refresher styling
+ion-refresher-content {
+  --color: #28a745;
+}
+
+// Loading styling
+ion-loading {
+  --background: rgba(255, 255, 255, 0.9);
+  --color: #28a745;
+  --spinner-color: #28a745;
+}
+
+// Toast styling
+ion-toast {
+  --background: linear-gradient(135deg, #28a745, #20c997);
+  --color: #ffffff;
+  --border-radius: 8px;
+}
+
+// Alert styling
+ion-alert {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-alert .alert-button {
+  --color: #28a745;
+}
+
+ion-alert .alert-button.alert-button-role-destructive {
+  --color: #dc3545;
+}
+
+// Modal styling
+ion-modal {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+// Popover styling
+ion-popover {
+  --background: #ffffff;
+  --color: #000000;
+  --box-shadow: 0 4px 16px rgba(40, 167, 69, 0.2);
+}
+
+// Action sheet styling
+ion-action-sheet {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-action-sheet .action-sheet-button {
+  --color: #28a745;
+}
+
+ion-action-sheet .action-sheet-destructive {
+  --color: #dc3545;
+}

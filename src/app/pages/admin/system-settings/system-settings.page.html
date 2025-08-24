@@ -1,0 +1,367 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>System Settings</ion-title>
+    <ion-buttons slot="end">
+      <ion-button fill="clear" (click)="saveSettings()">
+        <ion-icon name="save-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="settings-container">
+    <!-- General Settings -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="settings-outline"></ion-icon>
+          General Settings
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list>
+          <ion-item>
+            <ion-input 
+              label="App Name" 
+              labelPlacement="stacked"
+              [(ngModel)]="appSettings.appName"
+              placeholder="Enter app name">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="App Version" 
+              labelPlacement="stacked"
+              [(ngModel)]="appSettings.appVersion"
+              placeholder="Enter version">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="appSettings.maintenanceMode"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Maintenance Mode</h3>
+              <p>Temporarily disable app access</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="appSettings.allowNewRegistrations"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Allow New Registrations</h3>
+              <p>Enable new user sign-ups</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="appSettings.requireEmailVerification"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Require Email Verification</h3>
+              <p>Users must verify email before access</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="appSettings.requirePhoneVerification"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Require Phone Verification</h3>
+              <p>Users must verify phone number</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Notification Settings -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="notifications-outline"></ion-icon>
+          Notification Settings
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list>
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="notificationSettings.emailNotifications"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Email Notifications</h3>
+              <p>Send notifications via email</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="notificationSettings.smsNotifications"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>SMS Notifications</h3>
+              <p>Send notifications via SMS</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="notificationSettings.pushNotifications"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Push Notifications</h3>
+              <p>Send push notifications to mobile apps</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="notificationSettings.appointmentReminders"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Appointment Reminders</h3>
+              <p>Send automatic appointment reminders</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Reminder Hours Before" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="notificationSettings.reminderHours"
+              placeholder="24">
+            </ion-input>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Payment Settings -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="card-outline"></ion-icon>
+          Payment Settings
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list>
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="paymentSettings.enableOnlinePayments"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Enable Online Payments</h3>
+              <p>Allow patients to pay online</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-select 
+              label="Payment Gateway" 
+              labelPlacement="stacked"
+              [(ngModel)]="paymentSettings.paymentGateway">
+              <ion-select-option value="razorpay">Razorpay</ion-select-option>
+              <ion-select-option value="stripe">Stripe</ion-select-option>
+              <ion-select-option value="paytm">Paytm</ion-select-option>
+            </ion-select>
+          </ion-item>
+          
+          <ion-item>
+            <ion-select 
+              label="Currency" 
+              labelPlacement="stacked"
+              [(ngModel)]="paymentSettings.currency">
+              <ion-select-option value="INR">INR (₹)</ion-select-option>
+              <ion-select-option value="USD">USD ($)</ion-select-option>
+              <ion-select-option value="EUR">EUR (€)</ion-select-option>
+            </ion-select>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Tax Rate (%)" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="paymentSettings.taxRate"
+              placeholder="18">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-select 
+              label="Refund Policy" 
+              labelPlacement="stacked"
+              [(ngModel)]="paymentSettings.refundPolicy">
+              <ion-select-option value="full">Full Refund</ion-select-option>
+              <ion-select-option value="partial">Partial Refund</ion-select-option>
+              <ion-select-option value="none">No Refund</ion-select-option>
+            </ion-select>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Refund Days" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="paymentSettings.refundDays"
+              placeholder="7">
+            </ion-input>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Doctor Settings -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="medical-outline"></ion-icon>
+          Doctor Settings
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list>
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="doctorSettings.autoApproveKyc"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Auto Approve KYC</h3>
+              <p>Automatically approve doctor KYC documents</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-toggle 
+              [(ngModel)]="doctorSettings.requireMedicalLicense"
+              slot="end">
+            </ion-toggle>
+            <ion-label>
+              <h3>Require Medical License</h3>
+              <p>Medical license mandatory for registration</p>
+            </ion-label>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Max Slots Per Day" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="doctorSettings.maxSlotsPerDay"
+              placeholder="20">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Slot Duration (minutes)" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="doctorSettings.slotDuration"
+              placeholder="30">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Advance Booking Days" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="doctorSettings.advanceBookingDays"
+              placeholder="30">
+            </ion-input>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- System Limits -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>
+          <ion-icon name="shield-checkmark-outline"></ion-icon>
+          System Limits
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list>
+          <ion-item>
+            <ion-input 
+              label="Max Users Per Day" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="systemLimits.maxUsersPerDay"
+              placeholder="1000">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Max Appointments Per Day" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="systemLimits.maxAppointmentsPerDay"
+              placeholder="500">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Max File Upload Size (MB)" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="systemLimits.maxFileUploadSize"
+              placeholder="10">
+            </ion-input>
+          </ion-item>
+          
+          <ion-item>
+            <ion-input 
+              label="Session Timeout (minutes)" 
+              labelPlacement="stacked"
+              type="number"
+              [(ngModel)]="systemLimits.sessionTimeout"
+              placeholder="60">
+            </ion-input>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <ion-button expand="block" (click)="saveSettings()">
+        <ion-icon name="save-outline" slot="start"></ion-icon>
+        Save Settings
+      </ion-button>
+      
+      <ion-button expand="block" fill="outline" color="warning" (click)="resetToDefaults()">
+        <ion-icon name="refresh-outline" slot="start"></ion-icon>
+        Reset to Defaults
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

@@ -1,0 +1,188 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/patient/search-doctors"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Book Appointment</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="booking-container">
+    <!-- Doctor Info Card -->
+    <ion-card class="doctor-card">
+      <ion-card-content>
+        <div class="doctor-info">
+          <div class="doctor-avatar">
+            <ion-icon name="person-circle" size="large"></ion-icon>
+          </div>
+          <div class="doctor-details">
+            <h2>{{ selectedDoctor?.name || 'Dr. John Smith' }}</h2>
+            <p class="specialization">{{ selectedDoctor?.specialization || 'Cardiologist' }}</p>
+            <p class="experience">{{ selectedDoctor?.experience || '10' }} years experience</p>
+            <div class="rating">
+              <ion-icon name="star" color="warning"></ion-icon>
+              <span>{{ selectedDoctor?.rating || '4.8' }} ({{ selectedDoctor?.reviewCount || '150' }} reviews)</span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Appointment Form -->
+    <ion-card class="booking-form">
+      <ion-card-header>
+        <ion-card-title>Appointment Details</ion-card-title>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <form [formGroup]="bookingForm" *ngIf="bookingForm">
+        <!-- Date Selection -->
+        <div class="form-section">
+          <h3>Select Date</h3>
+          <div class="date-grid">
+            <div 
+              *ngFor="let date of availableDates" 
+              class="date-option"
+              [class.selected]="selectedDate === date.value"
+              (click)="selectDate(date.value)">
+              <div class="day">{{ date.day }}</div>
+              <div class="date">{{ date.date }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Availability Summary -->
+        <div class="form-section" *ngIf="selectedDate">
+          <h3>Availability</h3>
+          <div class="summary-item">
+            <span>Window:</span>
+            <span>
+              <ng-container *ngIf="dayWindow as dw">
+                {{ dw.enabled ? (dw.start + ' – ' + dw.end) : 'Closed' }}
+              </ng-container>
+            </span>
+          </div>
+          <div class="summary-item">
+            <span>Slot Duration:</span>
+            <span>{{ slotDurationMinutes }} minutes</span>
+          </div>
+          <div class="summary-item">
+            <span>Booked Today:</span>
+            <span>{{ bookedCountForSelectedDate }}</span>
+          </div>
+          <div class="summary-item">
+            <span>Remaining Capacity:</span>
+            <span>
+              <ng-container *ngIf="remainingCapacityForSelectedDate !== null; else noCap">
+                {{ remainingCapacityForSelectedDate }}
+              </ng-container>
+              <ng-template #noCap>
+                N/A
+              </ng-template>
+            </span>
+          </div>
+        </div>
+
+        <!-- Time Selection -->
+        <div class="form-section" *ngIf="selectedDate">
+          <h3>Select Time</h3>
+          <div class="time-grid">
+            <div 
+              *ngFor="let slot of timeSlots" 
+              class="time-slot"
+              [class.selected]="selectedTime === slot"
+              [class.booked]="slot.booked"
+              (click)="selectTime(slot)">
+              {{ slot.time }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Patient Details -->
+        <div class="form-section" *ngIf="selectedTime">
+          <h3>Patient Information</h3>
+          
+          <ion-item>
+            <ion-label position="stacked">Patient Name</ion-label>
+            <ion-input 
+              formControlName="patientName"
+              placeholder="Enter patient name"
+              required>
+            </ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Age</ion-label>
+            <ion-input 
+              formControlName="age"
+              type="number" 
+              placeholder="Enter age"
+              required>
+            </ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Phone Number</ion-label>
+            <ion-input 
+              formControlName="phone"
+              type="tel" 
+              placeholder="Enter phone number"
+              required>
+            </ion-input>
+          </ion-item>
+        </div>
+
+        <!-- Payment Options removed; default is cash -->
+
+        <!-- Booking Summary -->
+        <div class="form-section booking-summary" *ngIf="bookingForm.get('patientName')?.value">
+          <h3>Booking Summary</h3>
+          
+          <div class="summary-item">
+            <span>Doctor:</span>
+            <span>{{ selectedDoctor?.name || 'Dr. John Smith' }}</span>
+          </div>
+          
+          <div class="summary-item">
+            <span>Date:</span>
+            <span>{{ getFormattedDate(selectedDate) }}</span>
+          </div>
+          
+          <div class="summary-item">
+            <span>Time:</span>
+            <span>{{ selectedTime?.time }}</span>
+          </div>
+          
+          <div class="summary-item">
+            <span>Patient:</span>
+            <span>{{ bookingForm.get('patientName')?.value }}</span>
+          </div>
+          
+          <div class="summary-item">
+            <span>Consultation Fee:</span>
+            <span>₹{{ selectedDoctor?.consultationFee || '500' }}</span>
+          </div>
+          
+          <div class="summary-item total">
+            <span>Total Amount:</span>
+            <span>₹{{ selectedDoctor?.consultationFee || '500' }}</span>
+          </div>
+        </div>
+
+        <!-- Book Button -->
+        <ion-button 
+          expand="block" 
+          size="large" 
+          class="book-button"
+          [disabled]="!canBookAppointment() || isLoading"
+          (click)="bookAppointment()">
+          <ion-spinner *ngIf="isLoading" slot="start"></ion-spinner>
+          <ion-icon *ngIf="!isLoading" name="calendar" slot="start"></ion-icon>
+          {{ isLoading ? 'Processing...' : 'Book Appointment' }}
+        </ion-button>
+        </form>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

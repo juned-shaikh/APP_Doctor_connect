@@ -1,0 +1,83 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Admin Setup</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  
+  <div class="setup-container">
+    <div class="setup-header">
+      <ion-icon name="shield-checkmark" size="large" color="primary"></ion-icon>
+      <h1>Super Admin Setup</h1>
+      <p>Initialize the super admin account for your Doctor-Patient Booking App</p>
+    </div>
+
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Admin Credentials</ion-card-title>
+        <ion-card-subtitle>Use these credentials to login after setup</ion-card-subtitle>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <ion-item lines="none">
+          <ion-icon name="mail" slot="start" color="primary"></ion-icon>
+          <ion-label>
+            <h3>Email</h3>
+            <p>{{ adminCredentials.email }}</p>
+          </ion-label>
+          <ion-button fill="clear" slot="end" (click)="copyToClipboard(adminCredentials.email)">
+            <ion-icon name="copy"></ion-icon>
+          </ion-button>
+        </ion-item>
+        
+        <ion-item lines="none">
+          <ion-icon name="key" slot="start" color="primary"></ion-icon>
+          <ion-label>
+            <h3>Password</h3>
+            <p>{{ adminCredentials.password }}</p>
+          </ion-label>
+          <ion-button fill="clear" slot="end" (click)="copyToClipboard(adminCredentials.password)">
+            <ion-icon name="copy"></ion-icon>
+          </ion-button>
+        </ion-item>
+      </ion-card-content>
+    </ion-card>
+
+    <div class="setup-actions">
+      <ion-button 
+        expand="block" 
+        size="large" 
+        (click)="setupAdmin()"
+        class="setup-button">
+        <ion-icon name="rocket" slot="start"></ion-icon>
+        Create Super Admin Account
+      </ion-button>
+      
+      <ion-button 
+        expand="block" 
+        fill="outline" 
+        size="large" 
+        (click)="goToLogin()"
+        class="login-button">
+        <ion-icon name="log-in" slot="start"></ion-icon>
+        Go to Login
+      </ion-button>
+    </div>
+
+    <div class="setup-info">
+      <ion-card color="light">
+        <ion-card-content>
+          <h4><ion-icon name="information-circle" color="primary"></ion-icon> What this does:</h4>
+          <ul>
+            <li>Creates super admin account in Firebase Auth</li>
+            <li>Sets up admin user profile with full permissions</li>
+            <li>Initializes system settings and analytics</li>
+            <li>Enables doctor verification and user management</li>
+          </ul>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </div>
+
+</ion-content>
