@@ -10,6 +10,7 @@ export interface GoogleUser {
   name: string;
   imageUrl?: string;
   idToken: string;
+  accessToken?: string;
 }
 
 @Injectable({
@@ -29,7 +30,7 @@ export class GoogleAuthService {
       try {
         console.log('Initializing Google Auth for mobile...');
         await GoogleAuth.initialize({
-          clientId: 'YOUR_ACTUAL_WEB_CLIENT_ID.apps.googleusercontent.com', // Replace with your actual web client ID from Firebase Console
+          clientId: '1041888734011-bfa29q2cj2t7v7d34s9ah1o37ccumr64.apps.googleusercontent.com', // Replace with your actual web client ID from Firebase Console
           scopes: ['profile', 'email'],
           grantOfflineAccess: true,
         });
@@ -57,7 +58,8 @@ export class GoogleAuthService {
           email: result.email,
           name: result.name,
           imageUrl: result.imageUrl,
-          idToken: result.authentication.idToken
+          idToken: result.authentication.idToken,
+          accessToken: result.authentication.accessToken
         };
       } else {
         // Use web-based Google Sign-In for browser
@@ -109,17 +111,56 @@ export class GoogleAuthService {
 
   async signInWithFirebase(): Promise<any> {
     try {
-      const googleUser = await this.signIn();
-      
-      // Create Firebase credential from Google ID token
-      const credential = GoogleAuthProvider.credential(googleUser.idToken);
-      
-      // Sign in to Firebase with the credential
-      const result = await signInWithCredential(this.auth, credential);
-      
-      return result;
-    } catch (error) {
+      if (this.platform.is('capacitor')) {
+        // For mobile, get the raw result with both tokens
+        console.log('Getting Google Auth result for mobile Firebase sign-in...');
+        const result = await GoogleAuth.signIn();
+        console.log('Raw Google Auth result:', result);
+        
+        // Create Firebase credential with both ID token and access token
+        const credential = GoogleAuthProvider.credential(
+          result.authentication.idToken,
+          result.authentication.accessToken
+        );
+        
+        console.log('Created Firebase credential with both tokens');
+        
+        // Sign in to Firebase with the credential
+        const firebaseResult = await signInWithCredential(this.auth, credential);
+        console.log('Firebase sign-in successful:', firebaseResult.user.email);
+        
+        return firebaseResult;
+      } else {
+        // For web, use the existing method
+        const googleUser = await this.signIn();
+        const credential = GoogleAuthProvider.credential(googleUser.idToken);
+        const result = await signInWithCredential(this.auth, credential);
+        return result;
+      }
+    } catch (error: any) {
       console.error('Firebase Google Sign-In error:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        customData: error.customData
+      });
+      
+      // If we get invalid credential error, try alternative approach
+      if (error.code === 'auth/invalid-credential' && this.platform.is('capacitor')) {
+        console.log('Trying alternative Firebase sign-in approach...');
+        try {
+          // Try using only the ID token (sometimes access token causes issues)
+          const result = await GoogleAuth.signIn();
+          const credential = GoogleAuthProvider.credential(result.authentication.idToken, null);
+          const firebaseResult = await signInWithCredential(this.auth, credential);
+          console.log('Alternative Firebase sign-in successful');
+          return firebaseResult;
+        } catch (altError) {
+          console.error('Alternative approach also failed:', altError);
+          throw new Error('Google Sign-In authentication failed. Please try email/password instead.');
+        }
+      }
+      
       throw error;
     }
   }
