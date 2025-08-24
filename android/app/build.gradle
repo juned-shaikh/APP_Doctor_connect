@@ -24,7 +24,7 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('release-key.keystore')
+            storeFile file('doctorapp-release-key.keystore')
             storePassword 'android'
             keyAlias 'doctorapp-release'
             keyPassword 'android'
@@ -35,7 +35,10 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
+        shrinkResources false
+        debuggable false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
