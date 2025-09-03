@@ -1,7 +1,10 @@
-import { Component, NgZone, inject } from '@angular/core';
+import { Component, NgZone, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { NotificationService } from '../../services/notification.service';
+import { PushNotificationService } from '../../services/push-notification.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-patient-tabs',
@@ -15,7 +18,14 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
         routerLinkActive="tab-selected"
         class="tab-button"
       >
-        <span class="material-icons">{{ tab.icon }}</span>
+        <div class="tab-icon-container">
+          <span class="material-icons">{{ tab.icon }}</span>
+          <span 
+            *ngIf="tab.path === '/notifications' && unreadCount > 0" 
+            class="notification-badge">
+            {{ unreadCount > 99 ? '99+' : unreadCount }}
+          </span>
+        </div>
         <span class="tab-label">{{ tab.label }}</span>
       </a>
     </div>
@@ -66,11 +76,43 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
       position: relative;
       font-size: 0.8rem;
       
+      .tab-icon-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       .material-icons {
         font-size: 24px;
         margin-bottom: 4px;
         transition: all 0.2s ease;
         color: inherit;
+      }
+
+      .notification-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #ff4444;
+        color: white;
+        border-radius: 10px;
+        min-width: 18px;
+        height: 18px;
+        font-size: 10px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
       }
 
       .tab-label {
@@ -111,15 +153,21 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
     `
   ]
 })
-export class PatientTabsComponent {
+export class PatientTabsComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private ngZone = inject(NgZone);
+  private notificationService = inject(NotificationService);
+  private pushNotificationService = inject(PushNotificationService);
   
   tabs = [
     { path: '/patient/dashboard', icon: 'home', label: 'Home' },
     { path: '/patient/appointments', icon: 'event', label: 'Appointments' },
+    { path: '/notifications', icon: 'notifications', label: 'Notifications' },
     { path: '/patient/profile', icon: 'person', label: 'Profile' }
   ];
+
+  unreadCount = 0;
+  private subscriptions: Subscription[] = [];
 
   constructor() {
     // Force change detection when route changes to update active tab
@@ -128,5 +176,23 @@ export class PatientTabsComponent {
         // Trigger change detection
       });
     });
+  }
+
+  ngOnInit() {
+    // Subscribe to unread notification count
+    const unreadSub = this.notificationService.getUnreadCount().subscribe(count => {
+      this.unreadCount = count;
+    });
+    this.subscriptions.push(unreadSub);
+
+    // Subscribe to push notification count
+    const pushSub = this.pushNotificationService.getNotificationCount().subscribe(count => {
+      // This could be used for additional badge logic
+    });
+    this.subscriptions.push(pushSub);
+  }
+
+  ngOnDestroy() {
+    this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 }

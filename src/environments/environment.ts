@@ -12,8 +12,8 @@ export const environment = {
     storageBucket: "doctorconnect-f0aa0.firebasestorage.app",
     messagingSenderId: "1041888734011",
     appId: "1:1041888734011:web:6b79cc7f8918327cce251e",
-    measurementId: "G-6T7XKPM016"
-
+    measurementId: "G-6T7XKPM016",
+    vapidKey: "BHvw2_FPHr7iNTsFk1KdmUI7o-ycC--HsFHSMKeQrALKT28JTBVdaTlW6ADCppkAuKqKAU9v1PtprmxxQFAvH34" // Get this from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
   }
 };
 

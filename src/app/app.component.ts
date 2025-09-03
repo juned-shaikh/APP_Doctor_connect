@@ -1,16 +1,24 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
+import { PushNotificationService } from './services/push-notification.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: 'app.component.html',
   imports: [IonApp, IonRouterOutlet],
 })
-export class AppComponent {
-  constructor() {
+export class AppComponent implements OnInit {
+  constructor(
+    private pushNotificationService: PushNotificationService
+  ) {
     this.configureStatusBar();
+  }
+
+  ngOnInit() {
+    // Initialize push notifications
+    this.pushNotificationService.initializePushNotifications();
   }
 
   private async configureStatusBar() {

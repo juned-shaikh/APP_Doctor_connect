@@ -117,10 +117,10 @@ export class GoogleAuthService {
         const result = await GoogleAuth.signIn();
         console.log('Raw Google Auth result:', result);
         
-        // Create Firebase credential with both ID token and access token
+        // Create Firebase credential with ID token only (access token causes auth/invalid-credential)
         const credential = GoogleAuthProvider.credential(
           result.authentication.idToken,
-          result.authentication.accessToken
+          null
         );
         
         console.log('Created Firebase credential with both tokens');
