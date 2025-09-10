@@ -30,9 +30,9 @@ export class GoogleAuthService {
       try {
         console.log('Initializing Google Auth for mobile...');
         await GoogleAuth.initialize({
-          clientId: '1041888734011-bfa29q2cj2t7v7d34s9ah1o37ccumr64.apps.googleusercontent.com', // Replace with your actual web client ID from Firebase Console
+          clientId: '1041888734011-tivpcn8efo5723ks6q6vs1rh8e87teh2.apps.googleusercontent.com',
           scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
+          grantOfflineAccess: false, // Set to false to avoid token refresh issues
         });
         console.log('Google Auth initialized successfully');
       } catch (error) {
@@ -112,29 +112,42 @@ export class GoogleAuthService {
   async signInWithFirebase(): Promise<any> {
     try {
       if (this.platform.is('capacitor')) {
-        // For mobile, get the raw result with both tokens
+        // For mobile, get the Google Auth result
         console.log('Getting Google Auth result for mobile Firebase sign-in...');
         const result = await GoogleAuth.signIn();
         console.log('Raw Google Auth result:', result);
         
-        // Create Firebase credential with ID token only (access token causes auth/invalid-credential)
+        // Validate that we have the required tokens
+        if (!result.authentication?.idToken) {
+          throw new Error('No ID token received from Google Auth');
+        }
+        
+        console.log('ID Token received:', result.authentication.idToken.substring(0, 50) + '...');
+        
+        // Create Firebase credential with ONLY the ID token
+        // Do NOT pass the access token as it can cause auth/invalid-credential
         const credential = GoogleAuthProvider.credential(
           result.authentication.idToken,
-          null
+          null // Explicitly set access token to null
         );
         
-        console.log('Created Firebase credential with both tokens');
+        console.log('Created Firebase credential with ID token only');
         
         // Sign in to Firebase with the credential
         const firebaseResult = await signInWithCredential(this.auth, credential);
-        console.log('Firebase sign-in successful:', firebaseResult.user.email);
+        console.log('Firebase sign-in successful:', firebaseResult.user?.email);
         
         return firebaseResult;
       } else {
-        // For web, use the existing method
-        const googleUser = await this.signIn();
-        const credential = GoogleAuthProvider.credential(googleUser.idToken);
-        const result = await signInWithCredential(this.auth, credential);
+        // For web, use Firebase's built-in popup
+        console.log('Using web Google Sign-In for browser');
+        const provider = new GoogleAuthProvider();
+        provider.addScope('profile');
+        provider.addScope('email');
+        
+        const { signInWithPopup } = await import('@angular/fire/auth');
+        const result = await signInWithPopup(this.auth, provider);
+        
         return result;
       }
     } catch (error: any) {
@@ -145,23 +158,17 @@ export class GoogleAuthService {
         customData: error.customData
       });
       
-      // If we get invalid credential error, try alternative approach
-      if (error.code === 'auth/invalid-credential' && this.platform.is('capacitor')) {
-        console.log('Trying alternative Firebase sign-in approach...');
-        try {
-          // Try using only the ID token (sometimes access token causes issues)
-          const result = await GoogleAuth.signIn();
-          const credential = GoogleAuthProvider.credential(result.authentication.idToken, null);
-          const firebaseResult = await signInWithCredential(this.auth, credential);
-          console.log('Alternative Firebase sign-in successful');
-          return firebaseResult;
-        } catch (altError) {
-          console.error('Alternative approach also failed:', altError);
-          throw new Error('Google Sign-In authentication failed. Please try email/password instead.');
-        }
+      // Handle specific Firebase auth errors
+      if (error.code === 'auth/invalid-credential') {
+        console.error('Invalid credential error - this usually means the token format is wrong');
+        throw new Error('Google Sign-In authentication failed. The token format is invalid.');
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('Network error. Please check your internet connection.');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many failed attempts. Please try again later.');
       }
       
-      throw error;
+      throw new Error(`Google Sign-In failed: ${error.message || error.code || 'Unknown error'}`);
     }
   }
 
