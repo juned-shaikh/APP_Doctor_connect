@@ -1,22 +1,20 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
 import { AuthService } from '../../../services/auth.service';
-import { FirebaseService, UserData, AppointmentData as FirebaseAppointmentData } from '../../../services/firebase.service';
+import { FirebaseService } from '../../../services/firebase.service';
 import { ScheduleService, DoctorSchedule } from '../../../services/schedule.service';
 import { AppointmentService } from '../../../services/appointment.service';
-import { NotificationService } from '../../../services/notification.service';
-import { 
-  IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardHeader, 
+import {
+  IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonButton, IonIcon, IonText, IonItem,
   IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonRadio,
   IonRadioGroup, IonCheckbox, IonBackButton, IonButtons, IonNote, IonSpinner,
   ToastController, AlertController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { 
-  calendar, personCircle, star, arrowBack, calendarOutline, timeOutline, 
+import {
+  calendar, personCircle, star, arrowBack, calendarOutline, timeOutline,
   cashOutline, personOutline, documentTextOutline, cardOutline
 } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
@@ -40,6 +38,7 @@ interface Doctor {
   rating?: number;
   reviewCount?: number;
   experience?: number;
+  avatar?: string;
 }
 
 interface BookingFormData {
@@ -57,9 +56,9 @@ interface BookingFormData {
   styleUrls: ['./book-appointment.page.scss'],
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule, FormsModule, IonContent, IonHeader, IonTitle, IonToolbar, 
-    IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonIcon, 
-    IonText, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, 
+    CommonModule, ReactiveFormsModule, FormsModule, IonContent, IonHeader, IonTitle, IonToolbar,
+    IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonButton, IonIcon,
+    IonText, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
     IonRadio, IonRadioGroup, IonCheckbox, IonBackButton, IonButtons, IonNote, IonSpinner
   ]
 })
@@ -69,9 +68,10 @@ export class BookAppointmentPage implements OnInit {
   selectedTime: TimeSlot | null = null;
   bookingForm!: FormGroup;
   isLoading = false;
+  isLoadingSchedule = true;
   private schedule: DoctorSchedule | null = null;
   private doctorAppointments: any[] = [];
-  
+
   appointmentData: BookingFormData = {
     patientName: '',
     age: 0,
@@ -91,19 +91,18 @@ export class BookAppointmentPage implements OnInit {
     private authService: AuthService,
     private firebaseService: FirebaseService,
     private appointmentService: AppointmentService,
-    private notificationService: NotificationService,
     private toastController: ToastController,
     private alertController: AlertController,
     private scheduleService: ScheduleService
   ) {
-    addIcons({ 
+    addIcons({
       calendar, personCircle, star, arrowBack, calendarOutline, timeOutline,
       cashOutline, personOutline, documentTextOutline, cardOutline
     });
   }
 
   private getDayKey(d: Date): string {
-    const keys = ['sun','mon','tue','wed','thu','fri','sat'];
+    const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     return keys[d.getDay()];
   }
 
@@ -167,7 +166,7 @@ export class BookAppointmentPage implements OnInit {
   ngOnInit() {
     this.initializeForm();
     this.loadDoctorDetails();
-    this.generateAvailableDates();
+    // Available dates will be generated after schedule is loaded
     this.generateTimeSlots();
   }
 
@@ -177,11 +176,10 @@ export class BookAppointmentPage implements OnInit {
       age: ['', [Validators.required, Validators.min(1), Validators.max(120)]],
       phone: ['', [Validators.required, Validators.pattern(/^[0-9]{10,15}$/)]],
       appointmentType: ['clinic', Validators.required],
-      // Gender and symptoms removed as per requirements
       // Keep paymentMethod but default to 'cash'
       paymentMethod: ['cash', Validators.required]
     });
-    
+
     // Add form value changes listener for debugging
     this.bookingForm.valueChanges.subscribe(values => {
       console.log('Form values changed:', values);
@@ -191,7 +189,7 @@ export class BookAppointmentPage implements OnInit {
 
   async loadDoctorDetails() {
     const doctorId = this.route.snapshot.paramMap.get('doctorId');
-    
+
     if (doctorId) {
       try {
         // Fetch doctor details from Firebase
@@ -205,15 +203,27 @@ export class BookAppointmentPage implements OnInit {
                 consultationFee: doctor.consultationFee || 500,
                 rating: doctor.rating || 4.5,
                 reviewCount: doctor.reviewCount || 0,
-                experience: doctor.experience || 5
+                experience: doctor.experience || 5,
+                avatar: doctor.avatar
               };
 
               // Subscribe to doctor's schedule
               this.scheduleService.getSchedule(doctorId).subscribe(s => {
                 this.schedule = s;
-                // Regenerate slots when schedule arrives/changes
+                this.isLoadingSchedule = false;
+
+                // Regenerate available dates when schedule arrives/changes
+                this.generateAvailableDates();
+
+                // Check if currently selected date is still available
                 if (this.selectedDate) {
-                  this.generateTimeSlots();
+                  const isStillAvailable = this.availableDates.some(d => d.value === this.selectedDate);
+                  if (!isStillAvailable) {
+                    this.selectedDate = '';
+                    this.selectedTime = null;
+                  } else {
+                    this.generateTimeSlots();
+                  }
                 }
               });
 
@@ -256,18 +266,41 @@ export class BookAppointmentPage implements OnInit {
   generateAvailableDates() {
     const dates = [];
     const today = new Date();
-    
-    for (let i = 0; i < 7; i++) {
+
+    // Look ahead for up to 30 days to find available dates
+    for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      
-      dates.push({
-        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        date: date.getDate().toString(),
-        value: date.toISOString().split('T')[0]
-      });
+
+      const dayKey = this.getDayKey(date);
+      const dateString = date.toISOString().split('T')[0];
+
+      // Check if this day is enabled in the doctor's schedule
+      let isEnabled = false;
+
+      if (this.schedule?.weekly && (this.schedule.weekly as any)[dayKey]) {
+        isEnabled = (this.schedule.weekly as any)[dayKey].enabled === true;
+      }
+
+      // Check for exceptions on this specific date
+      const exception = this.schedule?.exceptions?.find(ex => ex.date === dateString);
+      if (exception) {
+        isEnabled = !exception.closed;
+      }
+
+      // Only add dates that are enabled
+      if (isEnabled) {
+        dates.push({
+          day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          date: date.getDate().toString(),
+          value: dateString
+        });
+
+        // Stop after finding 7 available dates
+        if (dates.length >= 7) break;
+      }
     }
-    
+
     this.availableDates = dates;
   }
 
@@ -401,10 +434,10 @@ export class BookAppointmentPage implements OnInit {
     if (!this.bookingForm) return false;
     return this.bookingForm.valid && !!this.selectedDate && !!this.selectedTime;
   }
-  
+
   getFormErrors(): any {
     if (!this.bookingForm) return {};
-    
+
     const errors: any = {};
     Object.keys(this.bookingForm.controls).forEach(key => {
       const control = this.bookingForm.get(key);
@@ -418,11 +451,11 @@ export class BookAppointmentPage implements OnInit {
   getFormattedDate(dateString: string): string {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   }
 
@@ -459,62 +492,65 @@ export class BookAppointmentPage implements OnInit {
 
   async confirmBooking() {
     this.isLoading = true;
-    
+
     try {
       const formData = this.bookingForm.value;
-      
+
       const currentUser = this.authService.getCurrentUser();
       if (!currentUser) {
         throw new Error('User not authenticated');
       }
 
-      // Create appointment data
+      // Create appointment data with proper validation
       const appointmentData = {
         doctorId: this.selectedDoctor?.id || '',
         doctorName: this.selectedDoctor?.name || '',
         patientId: currentUser.uid,
-        patientName: formData.patientName,
-        age: formData.age,
-        phone: formData.phone,
-        appointmentType: formData.appointmentType,
-        paymentMethod: formData.paymentMethod,
+        patientName: formData.patientName || '',
+        patientPhone: formData.phone || '',
+        patientAge: Number(formData.age) || 0,
+        patientGender: 'Not specified', // Default value
+        appointmentType: formData.appointmentType as 'clinic' | 'video',
+        symptoms: formData.symptoms || 'No symptoms specified',
+        paymentMethod: formData.paymentMethod as 'cash' | 'online',
+        paymentStatus: 'pending' as const,
         date: new Date(this.selectedDate),
         time: this.selectedTime?.time || '',
-        fee: this.selectedDoctor?.consultationFee || 0,
+        fee: this.getConsultationFee(),
         status: 'pending' as const,
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      
+
       console.log('Saving appointment:', appointmentData);
-      
+
       // Save to Firebase
       await this.appointmentService.bookAppointment(appointmentData);
-      
+
       const toast = await this.toastController.create({
         message: 'Appointment booked successfully!',
         duration: 2000,
         color: 'success',
         position: 'top'
       });
-      
+
       await toast.present();
-      
+
       // Wait for toast to be dismissed before navigating
       setTimeout(() => {
-        this.router.navigate(['/patient/dashboard'], { 
-          replaceUrl: true 
+        this.router.navigate(['/patient/dashboard'], {
+          replaceUrl: true
         }).catch(err => {
           console.error('Navigation error:', err);
           // Fallback to root if navigation fails
           this.router.navigate(['/']);
         });
       }, 2000);
-      
+
     } catch (error: any) {
       console.error('Error confirming booking:', error);
       const errorMessage = error.message || 'Failed to book appointment. Please try again.';
-      
+
       const toast = await this.toastController.create({
         message: errorMessage,
         duration: 3000,
@@ -528,4 +564,21 @@ export class BookAppointmentPage implements OnInit {
   }
 
   // Online payment removed; default is Pay at Clinic (cash)
+
+  getConsultationFee(): number {
+    if (!this.selectedDoctor) return 0;
+
+    const appointmentType = this.bookingForm?.get('appointmentType')?.value;
+    if (appointmentType === 'video') {
+      return 0; // Free video consultation
+    }
+    return this.selectedDoctor.consultationFee || 500;
+  }
+
+  // Handle doctor image loading error
+  onDoctorImageError() {
+    if (this.selectedDoctor) {
+      this.selectedDoctor.avatar = undefined;
+    }
+  }
 }

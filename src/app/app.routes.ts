@@ -38,4 +38,12 @@ export const routes: Routes = [
     path: 'tabs',
     loadChildren: () => import('./tabs/tabs.routes').then((m) => m.routes),
   },
+  {
+    path: 'video-consultation/:appointmentId',
+    loadComponent: () => import('./pages/video-consultation/video-consultation.page').then(m => m.VideoConsultationPage)
+  },
+  {
+    path: 'video-demo',
+    loadComponent: () => import('./pages/video-demo/video-demo.page').then(m => m.VideoDemoPage)
+  },
 ];

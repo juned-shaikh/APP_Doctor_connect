@@ -1,0 +1,112 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Video Consultation</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="video-call-content">
+  <!-- Connection Status -->
+  <div class="status-bar" [class.connected]="callState.isInCall && callState.remoteStream">
+    <ion-text>
+      <p>{{ connectionStatus }}</p>
+      <small *ngIf="participantName">{{ isDoctor ? 'Patient' : 'Doctor' }}: {{ participantName }}</small>
+    </ion-text>
+  </div>
+
+  <!-- Video Container -->
+  <div class="video-container">
+    <!-- Remote Video (Main) -->
+    <div class="remote-video-container">
+      <video 
+        #remoteVideo 
+        autoplay 
+        playsinline
+        [class.hidden]="!callState.remoteStream"
+        class="remote-video">
+      </video>
+      
+      <!-- Placeholder when no remote stream -->
+      <div class="video-placeholder" *ngIf="!callState.remoteStream">
+        <ion-icon name="person-circle" size="large"></ion-icon>
+        <ion-text>
+          <p>{{ callState.isConnecting ? 'Connecting...' : 'Waiting for participant' }}</p>
+        </ion-text>
+      </div>
+    </div>
+
+    <!-- Local Video (Picture-in-Picture) -->
+    <div class="local-video-container" *ngIf="callState.localStream">
+      <video 
+        #localVideo 
+        autoplay 
+        playsinline 
+        muted
+        class="local-video"
+        [class.video-off]="!isVideoEnabled">
+      </video>
+      
+      <!-- Video off indicator -->
+      <div class="video-off-indicator" *ngIf="!isVideoEnabled">
+        <ion-icon name="videocam-off"></ion-icon>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="callState.isConnecting && !callState.localStream">
+    <ion-spinner name="crescent"></ion-spinner>
+    <ion-text>
+      <p>Initializing video call...</p>
+    </ion-text>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-container" *ngIf="showVideoControls">
+    <div class="controls">
+      <!-- Audio Toggle -->
+      <ion-button 
+        fill="solid" 
+        shape="round" 
+        [color]="isAudioEnabled ? 'medium' : 'danger'"
+        (click)="toggleAudio()">
+        <ion-icon [name]="isAudioEnabled ? 'mic' : 'mic-off'" slot="icon-only"></ion-icon>
+      </ion-button>
+
+      <!-- Video Toggle -->
+      <ion-button 
+        fill="solid" 
+        shape="round" 
+        [color]="isVideoEnabled ? 'medium' : 'danger'"
+        (click)="toggleVideo()">
+        <ion-icon [name]="isVideoEnabled ? 'videocam' : 'videocam-off'" slot="icon-only"></ion-icon>
+      </ion-button>
+
+      <!-- End Call -->
+      <ion-button 
+        fill="solid" 
+        shape="round" 
+        color="danger"
+        (click)="endCall()">
+        <ion-icon name="call" slot="icon-only"></ion-icon>
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-container" *ngIf="callState.error">
+    <ion-card>
+      <ion-card-content>
+        <ion-text color="danger">
+          <h3>Connection Error</h3>
+          <p>{{ callState.error }}</p>
+        </ion-text>
+        <ion-button fill="outline" (click)="router.navigate(['/'])">
+          Go Back
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

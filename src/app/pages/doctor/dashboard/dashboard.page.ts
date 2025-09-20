@@ -13,7 +13,7 @@ import {
   calendarOutline, peopleOutline, documentTextOutline, analyticsOutline,
   timeOutline, cashOutline, checkmarkCircleOutline, warningOutline,
   settingsOutline, notificationsOutline, starOutline, trendingUpOutline,
-  ellipsisVerticalOutline, logOutOutline
+  ellipsisVerticalOutline, logOutOutline, videocamOutline
 } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
@@ -207,6 +207,26 @@ import { AuthService, User } from 'src/app/services/auth.service';
                     </ion-button>
                     <ion-button size="small" fill="outline" color="danger" (click)="rejectAppointment(appointment.id)">
                       Reject
+                    </ion-button>
+                  </div>
+                  <div class="action-buttons" *ngIf="appointment.status === 'Confirmed'">
+                    <ion-button 
+                      *ngIf="appointment.type === 'Video'" 
+                      size="small" 
+                      fill="solid" 
+                      color="primary" 
+                      (click)="startVideoCall(appointment.id)">
+                      <ion-icon name="videocam-outline" slot="start"></ion-icon>
+                      Start Video Call
+                    </ion-button>
+                    <ion-button 
+                      *ngIf="appointment.type === 'Clinic'" 
+                      size="small" 
+                      fill="outline" 
+                      color="medium" 
+                      (click)="markPatientPresent(appointment.id)">
+                      <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                      Mark Present
                     </ion-button>
                   </div>
                 </div>
@@ -495,7 +515,7 @@ doctorProfile: User | null = null;
       calendarOutline, peopleOutline, documentTextOutline, analyticsOutline,
       timeOutline, cashOutline, checkmarkCircleOutline, warningOutline,
       settingsOutline, notificationsOutline, starOutline, trendingUpOutline,
-      ellipsisVerticalOutline, logOutOutline
+      ellipsisVerticalOutline, logOutOutline, videocamOutline
     });
     // Subscribe to current user data
     this.authService.currentUser$.subscribe(user => {
@@ -691,6 +711,20 @@ getDoctorSpecialization(): string {
       await this.appointmentService.rejectAppointment(appointmentId, 'Rejected by doctor');
     } catch (err) {
       console.error('Reject appointment failed', err);
+    }
+  }
+
+  startVideoCall(appointmentId: string) {
+    // Navigate to video consultation page
+    this.router.navigate(['/video-consultation', appointmentId]);
+  }
+
+  async markPatientPresent(appointmentId: string) {
+    try {
+      await this.appointmentService.checkInAppointment(appointmentId);
+      // Could show a toast notification here
+    } catch (err) {
+      console.error('Mark patient present failed', err);
     }
   }
 

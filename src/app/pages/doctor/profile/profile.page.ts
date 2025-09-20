@@ -11,6 +11,7 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { FirebaseService, UserData } from '../../../services/firebase.service';
 import { AuthService, User } from '../../../services/auth.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-doctor-profile',
@@ -18,7 +19,7 @@ import { AuthService, User } from '../../../services/auth.service';
     <ion-header [translucent]="true">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button defaultHref="/doctor/dashboard"></ion-back-button>
+          <ion-back-button (click)="goBack()"></ion-back-button>
         </ion-buttons>
         <ion-title>Profile Settings</ion-title>
         <ion-buttons slot="end">
@@ -39,7 +40,7 @@ import { AuthService, User } from '../../../services/auth.service';
                 <ion-col size="3" sizeMd="2">
                   <div class="avatar-wrap">
                     <ion-avatar class="avatar">
-                      <ion-img [src]="avatarUrl || 'assets/avatar-placeholder.png'"></ion-img>
+                      <ion-img [src]="avatarUrl || 'assets/avatar-placeholder.svg'"></ion-img>
                     </ion-avatar>
                     <ion-button class="avatar-btn" size="small" fill="solid" (click)="triggerFile()">
                       <ion-icon name="camera-outline"></ion-icon>
@@ -200,7 +201,8 @@ export class DoctorProfilePage implements OnInit, OnDestroy {
   constructor(
     private fb: FormBuilder,
     private firebase: FirebaseService,
-    private auth: AuthService
+    private auth: AuthService,
+    public router: Router
   ) {
     addIcons({ personOutline, settingsOutline, cameraOutline, saveOutline });
   }
@@ -242,6 +244,10 @@ export class DoctorProfilePage implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.sub?.unsubscribe?.();
   }
+
+  goBack() {
+  this.router.navigate(['/doctor/dashboard']);
+}
 
   private buildForm() {
     this.form = this.fb.group({

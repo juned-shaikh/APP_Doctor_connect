@@ -108,8 +108,8 @@ import { NotificationService } from '../../../services/notification.service';
                   <span>{{ appointment.time }}</span>
                 </div>
                 <div class="detail-item">
-                  <ion-icon [name]="appointment.type === 'video' ? 'videocam-outline' : 'location-outline'" color="primary"></ion-icon>
-                  <span>{{ appointment.type === 'video' ? 'Video Consultation' : 'Clinic Visit' }}</span>
+                  <ion-icon [name]="appointment.appointmentType === 'video' ? 'videocam-outline' : 'location-outline'" color="primary"></ion-icon>
+                  <span>{{ appointment.appointmentType === 'video' ? 'Video Consultation' : 'Clinic Visit' }}</span>
                 </div>
                 <div class="detail-item">
                   <ion-icon [name]="appointment.paymentMethod === 'online' ? 'card-outline' : 'cash-outline'" color="primary"></ion-icon>
@@ -131,7 +131,7 @@ import { NotificationService } from '../../../services/notification.service';
                     Cancel
                   </ion-button>
                   <ion-button *ngIf="appointment.status === 'confirmed' && isToday(appointment.date)" fill="solid" size="small" (click)="joinConsultation(appointment)">
-                    {{ appointment.type === 'video' ? 'Join Video Call' : 'View Details' }}
+                    {{ appointment.appointmentType === 'video' ? 'Join Video Call' : 'View Details' }}
                   </ion-button>
                 </div>
               </div>
@@ -653,9 +653,9 @@ export class PatientAppointmentsPage implements OnInit {
   }
 
   joinConsultation(appointment: any) {
-    if (appointment.type === 'video') {
+    if (appointment.appointmentType === 'video') {
       // Navigate to video consultation page
-      this.router.navigate(['/patient/video-consultation', appointment.id]);
+      this.router.navigate(['/video-consultation', appointment.id]);
     } else {
       // Show clinic details
       this.viewAppointmentDetails(appointment);

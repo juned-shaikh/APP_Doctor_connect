@@ -772,4 +772,120 @@ async updateUserProfile(uid: string, data: Partial<UserData>) {
     
     await Promise.all(notifications);
   }
+
+  // Video Call Methods
+  async setCallOffer(callId: string, offer: RTCSessionDescriptionInit): Promise<void> {
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    await updateDoc(callRef, {
+      offer: {
+        type: offer.type,
+        sdp: offer.sdp
+      },
+      updatedAt: Timestamp.now()
+    });
+  }
+
+  async setCallAnswer(callId: string, answer: RTCSessionDescriptionInit): Promise<void> {
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    await updateDoc(callRef, {
+      answer: {
+        type: answer.type,
+        sdp: answer.sdp
+      },
+      updatedAt: Timestamp.now()
+    });
+  }
+
+  getCallOffer(callId: string): Observable<RTCSessionDescriptionInit | null> {
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    return new Observable(observer => {
+      const unsubscribe = onSnapshot(callRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          observer.next(data?.['offer'] || null);
+        } else {
+          observer.next(null);
+        }
+      });
+      return unsubscribe;
+    });
+  }
+
+  getCallAnswer(callId: string): Observable<RTCSessionDescriptionInit | null> {
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    return new Observable(observer => {
+      const unsubscribe = onSnapshot(callRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          observer.next(data?.['answer'] || null);
+        } else {
+          observer.next(null);
+        }
+      });
+      return unsubscribe;
+    });
+  }
+
+  async addIceCandidate(callId: string, candidate: RTCIceCandidate): Promise<void> {
+    const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
+    await addDoc(candidatesRef, {
+      candidate: candidate.candidate,
+      sdpMLineIndex: candidate.sdpMLineIndex,
+      sdpMid: candidate.sdpMid,
+      createdAt: Timestamp.now()
+    });
+  }
+
+  getIceCandidates(callId: string): Observable<RTCIceCandidateInit[]> {
+    const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
+    const q = query(candidatesRef, orderBy('createdAt', 'asc'));
+    
+    return new Observable(observer => {
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const candidates = snapshot.docs.map(doc => ({
+          candidate: doc.data()['candidate'],
+          sdpMLineIndex: doc.data()['sdpMLineIndex'],
+          sdpMid: doc.data()['sdpMid']
+        }));
+        observer.next(candidates);
+      });
+      return unsubscribe;
+    });
+  }
+
+  async createVideoCall(appointmentId: string, doctorId: string, patientId: string): Promise<string> {
+    const callsRef = collection(this.firestore, 'videoCalls');
+    const docRef = await addDoc(callsRef, {
+      appointmentId,
+      doctorId,
+      patientId,
+      status: 'waiting',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    return docRef.id;
+  }
+
+  async endCall(callId: string): Promise<void> {
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    await updateDoc(callRef, {
+      status: 'ended',
+      endedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+  }
+
+  getVideoCall(callId: string): Observable<any> {
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    return new Observable(observer => {
+      const unsubscribe = onSnapshot(callRef, (doc) => {
+        if (doc.exists()) {
+          observer.next({ id: doc.id, ...doc.data() });
+        } else {
+          observer.next(null);
+        }
+      });
+      return unsubscribe;
+    });
+  }
 }

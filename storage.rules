@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Images: avatar uploads
+    match /avatars/{userId}.jpg {
+      // Allow authenticated users to upload their own avatar
+      allow read: if true; // Anyone can read avatars (for public profiles)
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Images: any format for avatars
+    match /avatars/{userId}.{extension} {
+      // Allow authenticated users to upload their own avatar in any format
+      allow read: if true; // Anyone can read avatars (for public profiles)
+      allow write: if request.auth != null && 
+                      request.auth.uid == userId &&
+                      extension.matches('(jpg|jpeg|png|gif|webp)') &&
+                      resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+    
+    // Documents: KYC verification documents
+    match /documents/{userId}/{document} {
+      // Only the user can upload their documents, admins can read
+      allow read: if request.auth != null && 
+                     (request.auth.uid == userId || 
+                      exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+                      get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Prescription attachments
+    match /prescriptions/{prescriptionId}/{attachment} {
+      // Doctors can upload, patients and doctors can read their own
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

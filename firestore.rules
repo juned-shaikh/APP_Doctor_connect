@@ -120,6 +120,23 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
     
+    // Schedules collection rules
+    match /schedules/{doctorId} {
+      // Allow read access if:
+      // - User is admin
+      // - User is the doctor who owns the schedule
+      // - Authenticated user (patients can read doctor schedules for booking)
+      allow read: if isAdmin() || isOwner(doctorId) || isAuthenticated();
+      
+      // Allow write access if:
+      // - User is admin
+      // - User is the doctor who owns the schedule
+      allow write: if isAdmin() || isOwner(doctorId);
+      
+      // Allow create access for doctors and admins
+      allow create: if isAuthenticated() && (isAdmin() || isOwner(doctorId));
+    }
+    
     // Allow admin to read all collections for analytics and management
     match /{document=**} {
       allow read: if isAdmin();

@@ -10,6 +10,7 @@ import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ScheduleService, DoctorSchedule } from '../../../services/schedule.service';
 import { AuthService, User } from '../../../services/auth.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-doctor-schedule',
@@ -17,7 +18,7 @@ import { AuthService, User } from '../../../services/auth.service';
     <ion-header [translucent]="true">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button defaultHref="/doctor/dashboard"></ion-back-button>
+          <ion-back-button (click)="goBack()"></ion-back-button>
         </ion-buttons>
         <ion-title>Schedule</ion-title>
       </ion-toolbar>
@@ -178,7 +179,8 @@ export class DoctorSchedulePage implements OnInit {
   constructor(
     private fb: FormBuilder,
     private scheduleService: ScheduleService,
-    private authService: AuthService
+    private authService: AuthService,
+    public router: Router
   ) {
     addIcons({ timeOutline });
     this.form = this.fb.group({
@@ -210,7 +212,9 @@ export class DoctorSchedulePage implements OnInit {
       });
     });
   }
-
+ goBack() {
+    this.router.navigate(['/doctor/dashboard']);
+  }
   weeklyCtrl(key: string): FormGroup {
     return this.form.get('weekly.' + key) as FormGroup;
   }

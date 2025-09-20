@@ -14,7 +14,17 @@
       <ion-card-content>
         <div class="doctor-info">
           <div class="doctor-avatar">
-            <ion-icon name="person-circle" size="large"></ion-icon>
+            <img 
+              *ngIf="selectedDoctor?.avatar" 
+              [src]="selectedDoctor?.avatar" 
+              [alt]="selectedDoctor?.name || 'Doctor'"
+              class="avatar-image"
+              (error)="onDoctorImageError()">
+            <ion-icon 
+              *ngIf="!selectedDoctor?.avatar" 
+              name="person-circle" 
+              size="large">
+            </ion-icon>
           </div>
           <div class="doctor-details">
             <h2>{{ selectedDoctor?.name || 'Dr. John Smith' }}</h2>
@@ -40,7 +50,21 @@
         <!-- Date Selection -->
         <div class="form-section">
           <h3>Select Date</h3>
-          <div class="date-grid">
+          
+          <!-- Loading state -->
+          <div *ngIf="isLoadingSchedule" class="loading-state">
+            <ion-spinner></ion-spinner>
+            <p>Loading doctor's availability...</p>
+          </div>
+          
+          <!-- No available dates -->
+          <div *ngIf="!isLoadingSchedule && availableDates.length === 0" class="no-dates">
+            <ion-icon name="calendar-outline" size="large" color="medium"></ion-icon>
+            <p>No available dates found. The doctor may not have set their schedule yet.</p>
+          </div>
+          
+          <!-- Available dates -->
+          <div *ngIf="!isLoadingSchedule && availableDates.length > 0" class="date-grid">
             <div 
               *ngFor="let date of availableDates" 
               class="date-option"
@@ -131,6 +155,41 @@
               required>
             </ion-input>
           </ion-item>
+
+          <!-- <ion-item>
+            <ion-label position="stacked">Symptoms/Reason for Visit</ion-label>
+            <ion-textarea 
+              formControlName="symptoms"
+              placeholder="Describe your symptoms or reason for consultation"
+              rows="3"
+              required>
+            </ion-textarea>
+          </ion-item> -->
+        </div>
+
+        <!-- Consultation Type -->
+        <div class="form-section" *ngIf="selectedTime">
+          <h3>Consultation Type</h3>
+          
+          <ion-radio-group formControlName="appointmentType" >
+            <ion-item>
+              <ion-radio  slot="start" value="clinic"></ion-radio>
+              <ion-label>
+                <h3>Clinic Visit</h3>
+                <p>In-person consultation at clinic</p>
+                <p class="fee">Fee: ₹{{ selectedDoctor?.consultationFee || '500' }}</p>
+              </ion-label>
+            </ion-item>
+            
+            <ion-item>
+              <ion-radio slot="start" value="video"></ion-radio>
+              <ion-label>
+                <h3>Video Consultation</h3>
+                <p>Online video call consultation</p>
+                <p class="fee free">Fee: FREE</p>
+              </ion-label>
+            </ion-item>
+          </ion-radio-group>
         </div>
 
         <!-- Payment Options removed; default is cash -->
@@ -160,13 +219,20 @@
           </div>
           
           <div class="summary-item">
+            <span>Type:</span>
+            <span>{{ bookingForm.get('appointmentType')?.value === 'video' ? 'Video Consultation' : 'Clinic Visit' }}</span>
+          </div>
+          
+          <div class="summary-item">
             <span>Consultation Fee:</span>
-            <span>₹{{ selectedDoctor?.consultationFee || '500' }}</span>
+            <span>₹{{ getConsultationFee() }}</span>
           </div>
           
           <div class="summary-item total">
             <span>Total Amount:</span>
-            <span>₹{{ selectedDoctor?.consultationFee || '500' }}</span>
+            <span [class.free-consultation]="getConsultationFee() === 0">
+              {{ getConsultationFee() === 0 ? 'FREE' : '₹' + getConsultationFee() }}
+            </span>
           </div>
         </div>
 

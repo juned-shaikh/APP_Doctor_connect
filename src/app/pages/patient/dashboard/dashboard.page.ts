@@ -126,8 +126,19 @@ interface DashboardDoctor {
              >
               <ion-card-content>
                 <div class="doctor-card-row">
-                  <div class="avatar-initials" [style.background]="getAvatarColor(doctor.name)">
-                    {{ getInitials(doctor.name) }}
+                  <div class="avatar-container">
+                    <img 
+                      *ngIf="doctor.avatar" 
+                      [src]="doctor.avatar" 
+                      [alt]="doctor.name"
+                      class="avatar-image"
+                      (error)="onImageError($event, doctor)">
+                    <div 
+                      *ngIf="!doctor.avatar" 
+                      class="avatar-initials" 
+                      [style.background]="getAvatarColor(doctor.name)">
+                      {{ getInitials(doctor.name) }}
+                    </div>
                   </div>
                   <div class="doctor-main">
                     <div class="doctor-title-line">
@@ -208,25 +219,36 @@ interface DashboardDoctor {
 
               <div *ngIf="!isProfileLoading && selectedDoctorProfile" class="profile-body">
                 <div class="profile-top">
-                  <div class="avatar-initials lg" [style.background]="getAvatarColor(selectedDoctorProfile.name)">
-                    {{ getInitials(selectedDoctorProfile.name) }}
+                  <div class="avatar-container lg">
+                    <img 
+                      *ngIf="selectedDoctorProfile?.avatar" 
+                      [src]="selectedDoctorProfile?.avatar" 
+                      [alt]="selectedDoctorProfile?.name || 'Doctor'"
+                      class="avatar-image lg"
+                      (error)="onProfileImageError($event)">
+                    <div 
+                      *ngIf="!selectedDoctorProfile?.avatar" 
+                      class="avatar-initials lg" 
+                      [style.background]="getAvatarColor(selectedDoctorProfile?.name || '')">
+                      {{ getInitials(selectedDoctorProfile?.name || '') }}
+                    </div>
                   </div>
                   <div class="title-block">
-                    <h3 class="name">{{ selectedDoctorProfile.name }}</h3>
-                    <div class="meta-row" *ngIf="selectedDoctorProfile.specialization">
+                    <h3 class="name">{{ selectedDoctorProfile?.name }}</h3>
+                    <div class="meta-row" *ngIf="selectedDoctorProfile?.specialization">
                       <ion-icon name="medical-outline"></ion-icon>
-                      <span>{{ selectedDoctorProfile.specialization }}</span>
+                      <span>{{ selectedDoctorProfile?.specialization }}</span>
                     </div>
-                    <div class="meta-row" *ngIf="selectedDoctorProfile.experience">
+                    <div class="meta-row" *ngIf="selectedDoctorProfile?.experience">
                       <ion-icon name="briefcase-outline"></ion-icon>
-                      <span>{{ selectedDoctorProfile.experience }} year{{ selectedDoctorProfile.experience! > 1 ? 's' : '' }} exp.</span>
+                      <span>{{ selectedDoctorProfile?.experience }} year{{ (selectedDoctorProfile?.experience || 0) > 1 ? 's' : '' }} exp.</span>
                     </div>
                   </div>
                 </div>
 
-                <div class="section" *ngIf="selectedDoctorProfile.bio">
+                <div class="section" *ngIf="selectedDoctorProfile?.bio">
                   <div class="section-title">About</div>
-                  <div class="section-text">{{ selectedDoctorProfile.bio }}</div>
+                  <div class="section-text">{{ selectedDoctorProfile?.bio }}</div>
                 </div>
 
                 <div class="section">
@@ -235,32 +257,32 @@ interface DashboardDoctor {
                     <ion-icon name="business-outline"></ion-icon>
                     <div>
                       <div class="k">Name</div>
-                      <div class="v">{{ selectedDoctorProfile.clinicDetails?.name }}</div>
+                      <div class="v">{{ selectedDoctorProfile?.clinicDetails?.name }}</div>
                     </div>
                   </div>
                   <div class="kv" *ngIf="selectedDoctorProfile.clinicDetails?.address?.line">
                     <ion-icon name="home-outline"></ion-icon>
                     <div>
                       <div class="k">Address</div>
-                      <div class="v">{{ selectedDoctorProfile.clinicDetails?.address?.line }}</div>
+                      <div class="v">{{ selectedDoctorProfile?.clinicDetails?.address?.line }}</div>
                     </div>
                   </div>
-                  <div class="kv" *ngIf="selectedDoctorProfile.clinicDetails?.address?.city || selectedDoctorProfile.clinicDetails?.address?.state || selectedDoctorProfile.clinicDetails?.address?.pincode">
+                  <div class="kv" *ngIf="selectedDoctorProfile?.clinicDetails?.address?.city || selectedDoctorProfile?.clinicDetails?.address?.state || selectedDoctorProfile?.clinicDetails?.address?.pincode">
                     <ion-icon name="location-outline"></ion-icon>
                     <div>
                       <div class="k">Location</div>
                       <div class="v">
-                        {{ selectedDoctorProfile.clinicDetails?.address?.city }}
-                        <span *ngIf="selectedDoctorProfile.clinicDetails?.address?.state">, {{ selectedDoctorProfile.clinicDetails?.address?.state }}</span>
-                        <span *ngIf="selectedDoctorProfile.clinicDetails?.address?.pincode"> - {{ selectedDoctorProfile.clinicDetails?.address?.pincode }}</span>
+                        {{ selectedDoctorProfile?.clinicDetails?.address?.city }}
+                        <span *ngIf="selectedDoctorProfile?.clinicDetails?.address?.state">, {{ selectedDoctorProfile?.clinicDetails?.address?.state }}</span>
+                        <span *ngIf="selectedDoctorProfile?.clinicDetails?.address?.pincode"> - {{ selectedDoctorProfile?.clinicDetails?.address?.pincode }}</span>
                       </div>
                     </div>
                   </div>
-                  <div class="kv" *ngIf="selectedDoctorProfile.clinicDetails?.mapsUrl">
+                  <div class="kv" *ngIf="selectedDoctorProfile?.clinicDetails?.mapsUrl">
                     <ion-icon name="map-outline"></ion-icon>
                     <div>
                       <div class="k">Map</div>
-                      <div class="v"><a [href]="selectedDoctorProfile.clinicDetails?.mapsUrl" target="_blank">Open in Maps</a></div>
+                      <div class="v"><a [href]="selectedDoctorProfile?.clinicDetails?.mapsUrl" target="_blank">Open in Maps</a></div>
                     </div>
                   </div>
                 </div>
@@ -487,6 +509,19 @@ interface DashboardDoctor {
       gap: 12px;
       align-items: flex-start;
     }
+    .avatar-container {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      position: relative;
+    }
+    .avatar-image {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
     .avatar-initials {
       width: 48px;
       height: 48px;
@@ -633,6 +668,16 @@ interface DashboardDoctor {
       gap: 12px;
       align-items: center;
       margin: 8px 0 12px 0;
+    }
+    .avatar-container.lg {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+    }
+    .avatar-image.lg {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
     }
     .avatar-initials.lg {
       width: 56px;
@@ -982,5 +1027,18 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
       ]
     });
     await alert.present();
+  }
+
+  // Handle image loading errors
+  onImageError(event: any, doctor: DashboardDoctor) {
+    // Hide the broken image and show initials instead
+    doctor.avatar = undefined;
+  }
+
+  onProfileImageError(event: any) {
+    // Hide the broken image in profile modal
+    if (this.selectedDoctorProfile) {
+      this.selectedDoctorProfile.avatar = undefined;
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { 
+import {
   IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardContent,
   IonButton, IonIcon, IonText, IonBackButton, IonButtons, IonChip, IonLabel,
   IonSegment, IonSegmentButton, IonRefresher, IonRefresherContent, IonSpinner,
@@ -8,8 +8,8 @@ import {
   IonBadge
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { 
-  calendarOutline, timeOutline, personOutline, callOutline, 
+import {
+  calendarOutline, timeOutline, personOutline, callOutline,
   videocamOutline, cashOutline, cardOutline, ellipsisVerticalOutline,
   checkmarkCircleOutline, closeCircleOutline, warningOutline,
   documentTextOutline, locationOutline, refreshOutline, searchOutline,
@@ -28,7 +28,7 @@ import { Subscription } from 'rxjs';
     <ion-header [translucent]="true">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button defaultHref="/doctor/dashboard"></ion-back-button>
+          <ion-back-button (click)="goBack()"></ion-back-button>
         </ion-buttons>
         <ion-title>Appointment Bookings</ion-title>
         <ion-buttons slot="end">
@@ -90,8 +90,8 @@ import { Subscription } from 'rxjs';
                   </ion-avatar>
                   <div class="patient-details">
                     <h3>{{ booking.patientName }}</h3>
-                    <p class="age-gender">{{ booking.age }} years, {{ booking.gender }}</p>
-                    <p class="phone">{{ booking.phone }}</p>
+                    <p class="age-gender">{{ booking.patientAge }} years, {{ booking.patientGender }}</p>
+                    <p class="phone">{{ booking.patientPhone }}</p>
                   </div>
                 </div>
                 <div class="booking-actions">
@@ -115,8 +115,8 @@ import { Subscription } from 'rxjs';
                   <span>{{ booking.time }}</span>
                 </div>
                 <div class="detail-item">
-                  <ion-icon [name]="booking.type === 'video' ? 'videocam-outline' : 'location-outline'" color="primary"></ion-icon>
-                  <span>{{ booking.type === 'video' ? 'Video Consultation' : 'Clinic Visit' }}</span>
+                  <ion-icon [name]="booking.appointmentType === 'video' ? 'videocam-outline' : 'location-outline'" color="primary"></ion-icon>
+                  <span>{{ booking.appointmentType === 'video' ? 'Video Consultation' : 'Clinic Visit' }}</span>
                 </div>
                 <div class="detail-item">
                   <ion-icon [name]="booking.paymentMethod === 'online' ? 'card-outline' : 'cash-outline'" color="primary"></ion-icon>
@@ -139,8 +139,8 @@ import { Subscription } from 'rxjs';
                     Reject
                   </ion-button>
                   <ion-button *ngIf="booking.status === 'confirmed' && isToday(booking.date)" fill="solid" size="small" (click)="startConsultation(booking)">
-                    <ion-icon [name]="booking.type === 'video' ? 'videocam-outline' : 'person-outline'" slot="start"></ion-icon>
-                    {{ booking.type === 'video' ? 'Start Video Call' : 'Mark Present' }}
+                    <ion-icon [name]="booking.appointmentType === 'video' ? 'videocam-outline' : 'person-outline'" slot="start"></ion-icon>
+                    {{ booking.appointmentType === 'video' ? 'Start Video Call' : 'Mark Present' }}
                   </ion-button>
                   <ion-button *ngIf="booking.status === 'completed'" fill="outline" size="small" (click)="viewPrescription(booking)">
                     <ion-icon name="document-text-outline" slot="start"></ion-icon>
@@ -405,7 +405,7 @@ export class DoctorBookingsPage implements OnInit {
   selectedFilter = 'all';
   isLoading = true;
   private bookingsSub?: Subscription;
-  
+
   // Stats
   todayBookings = 0;
   pendingApprovals = 0;
@@ -421,7 +421,7 @@ export class DoctorBookingsPage implements OnInit {
     private firebaseService: FirebaseService,
     private appointmentService: AppointmentService
   ) {
-    addIcons({ 
+    addIcons({
       calendarOutline, timeOutline, personOutline, callOutline,
       videocamOutline, cashOutline, cardOutline, ellipsisVerticalOutline,
       checkmarkCircleOutline, closeCircleOutline, warningOutline,
@@ -458,6 +458,7 @@ export class DoctorBookingsPage implements OnInit {
     this.bookingsSub?.unsubscribe();
     this.bookingsSub = this.firebaseService.getAppointmentsByDoctor(doctorUid).subscribe({
       next: (appointments) => {
+        console.log('Appointments received:', appointments.length);
         this.bookings = appointments;
         this.calculateStats();
         this.filterBookings();
@@ -469,23 +470,26 @@ export class DoctorBookingsPage implements OnInit {
       }
     });
   }
+  goBack() {
+    this.router.navigate(['/doctor/dashboard']);
+  }
 
   calculateStats() {
     const today = new Date();
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    this.todayBookings = this.bookings.filter(booking => 
+
+    this.todayBookings = this.bookings.filter(booking =>
       new Date(booking.date).toDateString() === today.toDateString()
     ).length;
-    
-    this.pendingApprovals = this.bookings.filter(booking => 
+
+    this.pendingApprovals = this.bookings.filter(booking =>
       booking.status === 'pending'
     ).length;
-    
-    const weeklyBookings = this.bookings.filter(booking => 
+console.log(this.pendingApprovals)
+    const weeklyBookings = this.bookings.filter(booking =>
       new Date(booking.date) >= weekAgo && new Date(booking.date) <= today
     );
-    
+
     this.weeklyBookings = weeklyBookings.length;
     this.weeklyRevenue = weeklyBookings
       .filter(booking => booking.status === 'completed' || booking.paymentMethod === 'online')
@@ -501,7 +505,7 @@ export class DoctorBookingsPage implements OnInit {
     if (this.selectedFilter === 'all') {
       this.filteredBookings = [...this.bookings];
     } else {
-      this.filteredBookings = this.bookings.filter(booking => 
+      this.filteredBookings = this.bookings.filter(booking =>
         booking.status.toLowerCase() === this.selectedFilter
       );
     }
@@ -633,17 +637,19 @@ export class DoctorBookingsPage implements OnInit {
 
   async startConsultation(booking: any) {
     try {
-      if (booking.type === 'video') {
-        // Placeholder for video call start
-        await this.showToast('Starting video consultation (coming soon)', 'primary');
+      if (booking.appointmentType === 'video') {
+        // Navigate to video consultation page
+        this.router.navigate(['/video-consultation', booking.id]);
         return;
       }
+      
+      // For clinic visits, mark patient as present
       if (!booking.id) return;
       await this.appointmentService.checkInAppointment(booking.id);
       await this.showToast('Marked patient as present', 'success');
     } catch (e) {
       console.error(e);
-      await this.showToast('Failed to mark present', 'danger');
+      await this.showToast('Failed to start consultation', 'danger');
     }
   }
 
@@ -660,4 +666,6 @@ export class DoctorBookingsPage implements OnInit {
     });
     await toast.present();
   }
+
+
 }

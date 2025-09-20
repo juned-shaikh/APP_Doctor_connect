@@ -1,0 +1,69 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Video Consultation Demo</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="demo-container">
+    <ion-card>
+      <ion-card-content>
+        <div class="demo-header">
+          <ion-icon name="videocam-outline" size="large" color="primary"></ion-icon>
+          <ion-text color="primary">
+            <h2>Free Video Consultation</h2>
+            <p>Test the video consultation feature</p>
+          </ion-text>
+        </div>
+
+        <div class="demo-form">
+          <ion-item>
+            <ion-label position="stacked">Appointment ID</ion-label>
+            <ion-input 
+              [(ngModel)]="appointmentId"
+              placeholder="Enter any ID (e.g., demo-123)"
+              required>
+            </ion-input>
+          </ion-item>
+
+          <div class="demo-actions">
+            <ion-button 
+              expand="block" 
+              fill="solid" 
+              color="primary"
+              [disabled]="isCreating"
+              (click)="createDemoAppointment()">
+              <ion-icon name="call-outline" slot="start"></ion-icon>
+              {{ isCreating ? 'Creating...' : 'Create & Join Demo Call' }}
+            </ion-button>
+
+            <ion-button 
+              expand="block" 
+              fill="outline" 
+              color="secondary"
+              (click)="joinExistingCall()">
+              <ion-icon name="videocam-outline" slot="start"></ion-icon>
+              Join Existing Call
+            </ion-button>
+          </div>
+        </div>
+
+        <div class="demo-info">
+          <ion-text color="medium">
+            <h3>How it works:</h3>
+            <ul>
+              <li>Enter any appointment ID</li>
+              <li>Click "Create & Join Demo Call" to simulate booking</li>
+              <li>Or use "Join Existing Call" to join with the same ID</li>
+              <li>Video calls are completely free</li>
+              <li>Uses WebRTC for peer-to-peer connection</li>
+            </ul>
+          </ion-text>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
