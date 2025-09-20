@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { sendEmailVerification } from '@angular/fire/auth';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import {
@@ -716,14 +717,39 @@ export class RegisterPage implements OnInit {
     }
   }
 
-  private handleSuccessfulRegistration() {
-    this.showToast('Registration successful!', 'success');
-
-    if (this.userType === 'doctor') {
-      this.router.navigate(['/doctor/kyc-verification'], { replaceUrl: true });
-    } else {
-      this.router.navigate(['/patient/dashboard'], { replaceUrl: true });
-    }
+  private async handleSuccessfulRegistration() {
+    this.isLoading = false;
+    
+    const alert = await this.alertController.create({
+      header: 'Registration Successful!',
+      message: 'A verification email has been sent to your email address. Please check your inbox and verify your email before logging in.',
+      buttons: [
+        {
+          text: 'OK',
+          handler: () => {
+            this.router.navigate(['/auth/login']);
+          }
+        },
+        {
+          text: 'Resend Verification Email',
+          handler: async () => {
+            try {
+              const user = this.authService.getCurrentUser();
+              if (user?.email) {
+                await sendEmailVerification(user as any);
+                this.showToast('Verification email resent!', 'success');
+              }
+            } catch (error) {
+              console.error('Error resending verification email:', error);
+              this.showToast('Failed to resend verification email', 'danger');
+            }
+            return false; // Keep the alert open
+          }
+        }
+      ]
+    });
+    
+    await alert.present();
   }
 
   private markFormGroupTouched() {

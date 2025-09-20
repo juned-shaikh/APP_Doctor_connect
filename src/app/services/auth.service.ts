@@ -1,5 +1,21 @@
 import { Injectable } from '@angular/core';
-import { Auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, signInWithCredential, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider } from '@angular/fire/auth';
+import { 
+  Auth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithCredential, 
+  RecaptchaVerifier, 
+  signInWithPhoneNumber, 
+  PhoneAuthProvider,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  sendPasswordResetEmail,
+  sendEmailVerification
+} from '@angular/fire/auth';
 import { Firestore, getDoc, query, where, getDocs, collection } from '@angular/fire/firestore';
 import { doc, setDoc } from 'firebase/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
@@ -18,6 +34,7 @@ export interface User {
   userType: UserRole;
   isActive: boolean;
   verificationStatus?: 'pending' | 'under_review' | 'approved' | 'rejected';
+  emailVerified?: boolean;
   avatar?: string;
   isRoleLocked?: boolean;
   createdAt: Date;
@@ -276,6 +293,15 @@ export class AuthService {
       }
 
       const userCredential = await createUserWithEmailAndPassword(this.auth, userData.email, userData.password);
+      
+      // Send email verification
+      try {
+        await sendEmailVerification(userCredential.user);
+        console.log('Email verification sent to:', userData.email);
+      } catch (emailError) {
+        console.error('Error sending email verification:', emailError);
+        // Don't fail registration if email verification fails
+      }
 
       const newUser: User = {
         uid: userCredential.user.uid,
@@ -287,6 +313,7 @@ export class AuthService {
         isActive: userData.userType === 'patient', // Auto-activate patients
         isRoleLocked: true,
         verificationStatus: userData.userType === 'doctor' ? 'pending' : 'approved',
+        emailVerified: false, // Track email verification status
         createdAt: new Date()
       };
 
@@ -383,6 +410,81 @@ export class AuthService {
     } catch (error) {
       console.error('Error signing in with password:', error);
       throw error;
+    }
+  }
+
+  // Reauthenticate user with password
+  async reauthenticateUser(email: string, password: string): Promise<boolean> {
+    try {
+      const user = this.auth.currentUser;
+      if (!user || !user.email) {
+        throw new Error('No user is currently signed in');
+      }
+
+      // If the user signed in with email/password, we need to reauthenticate
+      if (user.email === email) {
+        const credential = EmailAuthProvider.credential(email, password);
+        await reauthenticateWithCredential(user, credential);
+        return true;
+      }
+      
+      // For Google sign-in, we can't reauthenticate with password
+      const providerData = user.providerData.find(p => p.providerId === 'google.com');
+      if (providerData) {
+        // Redirect to Google reauthentication
+        await this.signInWithGoogle();
+        return true;
+      }
+
+      throw new Error('Could not reauthenticate user');
+    } catch (error) {
+      console.error('Error reauthenticating user:', error);
+      throw error;
+    }
+  }
+
+  // Update user's password
+  async updatePassword(newPassword: string): Promise<void> {
+    try {
+      const user = this.auth.currentUser;
+      if (!user) throw new Error('No user is currently signed in');
+      await updatePassword(user, newPassword);
+    } catch (error) {
+      console.error('Error updating password:', error);
+      throw error;
+    }
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    try {
+      console.log('Attempting to send password reset email to:', email);
+      await sendPasswordResetEmail(this.auth, email);
+      console.log('Password reset email sent successfully to:', email);
+    } catch (error: any) {
+      console.error('Error sending password reset email:', {
+        code: error.code,
+        message: error.message,
+        email: email,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (error.code === 'auth/user-not-found') {
+        // For security, we don't reveal if the email exists or not
+        console.log('User not found for email:', email);
+        throw new Error('If an account exists with this email, you will receive a password reset link.');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('The email address is not valid.');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many attempts. Please try again later.');
+      } else if (error.code === 'auth/missing-continue-uri') {
+        throw new Error('Password reset configuration is missing. Please contact support.');
+      } else if (error.code === 'auth/unauthorized-continue-uri') {
+        console.error('Unauthorized domain. Check Firebase Authorized domains in console.');
+        throw new Error('Password reset is not properly configured. Please contact support.');
+      } else {
+        console.error('Unexpected error during password reset:', error);
+        throw new Error('Failed to send password reset email. Please try again later.');
+      }
     }
   }
 

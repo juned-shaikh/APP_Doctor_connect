@@ -60,14 +60,7 @@ import { FirebaseService, UserData, AppointmentData } from '../../../services/fi
         <ion-card class="profile-header-card">
           <ion-card-content>
             <div class="profile-header">
-              <div class="avatar-section">
-                <ion-avatar class="profile-avatar">
-                  <img [src]="patientData?.avatar || 'assets/default-patient.png'" [alt]="patientData?.name">
-                </ion-avatar>
-                <ion-button *ngIf="isEditing" fill="clear" size="small" class="camera-btn" (click)="changeAvatar()">
-                  <ion-icon name="camera-outline"></ion-icon>
-                </ion-button>
-              </div>
+             
               
               <div class="profile-info">
                 <h1 *ngIf="!isEditing">{{ patientData?.name || 'Patient' }}</h1>
@@ -296,7 +289,7 @@ import { FirebaseService, UserData, AppointmentData } from '../../../services/fi
               </div>
             </div>
             
-            <ion-button fill="clear" expand="block" (click)="viewAllAppointments()">
+            <ion-button  expand="block" (click)="viewAllAppointments()">
               View All Appointments
             </ion-button>
           </ion-card-content>
@@ -631,7 +624,10 @@ export class PatientProfilePage implements OnInit, OnDestroy {
 
   private setupBackButtonHandler() {
     // Handle hardware back button on mobile devices
-    this.platform.backButton.subscribeWithPriority(10, () => {
+    this.platform.backButton.subscribeWithPriority(10, (processNextHandler) => {
+      // Prevent default back button behavior
+      processNextHandler();
+      // Navigate to dashboard
       this.goToDashboard();
     });
   }
@@ -764,7 +760,9 @@ export class PatientProfilePage implements OnInit, OnDestroy {
 
     try {
       const currentUser = this.authService.getCurrentUser();
-      if (!currentUser) return;
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
 
       // Prepare medical history array
       const medicalHistory = this.editData.medicalHistoryText
@@ -772,25 +770,138 @@ export class PatientProfilePage implements OnInit, OnDestroy {
         : [];
 
       const updateData: Partial<UserData> = {
-        name: this.editData.name,
-        phone: this.editData.phone,
-        email: this.editData.email,
+        name: this.editData.name || '',
+        phone: this.editData.phone || '',
+        email: this.editData.email || '',
         age: this.editData.age ? Number(this.editData.age) : undefined,
-        gender: this.editData.gender,
-        bloodGroup: this.editData.bloodGroup,
-        medicalHistory: medicalHistory
+        gender: this.editData.gender || '',
+        bloodGroup: this.editData.bloodGroup || '',
+        medicalHistory: medicalHistory,
+        updatedAt: new Date()
       };
 
+      console.log('Updating profile with data:', updateData);
+      
       await this.firebaseService.updateUserProfile(currentUser.uid, updateData);
-
+      
+      // Refresh the patient data
+      await this.loadPatientProfile();
+      
       this.isEditing = false;
       await this.showToast('Profile updated successfully', 'success');
     } catch (error) {
       console.error('Error saving profile:', error);
-      await this.showToast('Failed to save profile', 'danger');
+      await this.showToast('Failed to save profile: ' + (error as Error).message, 'danger');
     } finally {
       await loading.dismiss();
     }
+  }
+
+  async changePassword() {
+    const alert = await this.alertController.create({
+      header: 'Change Password',
+      inputs: [
+        {
+          name: 'currentPassword',
+          type: 'password',
+          placeholder: 'Current Password',
+          attributes: {
+            required: true
+          }
+        },
+        {
+          name: 'newPassword',
+          type: 'password',
+          placeholder: 'New Password',
+          attributes: {
+            minLength: 6,
+            required: true
+          }
+        },
+        {
+          name: 'confirmPassword',
+          type: 'password',
+          placeholder: 'Confirm New Password',
+          attributes: {
+            minLength: 6,
+            required: true
+          }
+        }
+      ],
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Update',
+          handler: async (data) => {
+            if (data.newPassword !== data.confirmPassword) {
+              await this.showToast('New passwords do not match', 'warning');
+              return false;
+            }
+
+            if (data.newPassword.length < 6) {
+              await this.showToast('Password must be at least 6 characters long', 'warning');
+              return false;
+            }
+
+            const loading = await this.loadingController.create({
+              message: 'Updating password...',
+            });
+            await loading.present();
+
+            try {
+              const currentUser = this.authService.getCurrentUser();
+              if (!currentUser?.email) {
+                throw new Error('User not authenticated');
+              }
+
+              // Re-authenticate user
+              const isAuthenticated = await this.authService.reauthenticateUser(
+                currentUser.email,
+                data.currentPassword
+              );
+
+              if (!isAuthenticated) {
+                throw new Error('Current password is incorrect');
+              }
+
+              // Update password
+              await this.authService.updatePassword(data.newPassword);
+              await this.showToast('Password updated successfully', 'success');
+              return true;
+            } catch (error) {
+              console.error('Error changing password:', error);
+              const errorMessage = (error as Error).message || 'Failed to update password';
+              await this.showToast(errorMessage, 'danger');
+              return false;
+            } finally {
+              await loading.dismiss();
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+  
+  // Show toast notification
+  private async showToast(message: string, color: 'success' | 'danger' | 'warning' = 'success') {
+    const toast = await this.toastController.create({
+      message,
+      duration: 3000,
+      color,
+      position: 'bottom',
+      buttons: [
+        {
+          icon: 'close',
+          role: 'cancel'
+        }
+      ]
+    });
+    await toast.present();
   }
 
   async changeAvatar() {
@@ -801,14 +912,14 @@ export class PatientProfilePage implements OnInit, OnDestroy {
           text: 'Take Photo',
           icon: 'camera-outline',
           handler: () => {
-            this.showToast('Camera feature coming soon', 'primary');
+            this.showToast('Camera feature coming soon', 'success');
           }
         },
         {
           text: 'Choose from Gallery',
           icon: 'image-outline',
           handler: () => {
-            this.showToast('Gallery feature coming soon', 'primary');
+            this.showToast('Gallery feature coming soon', 'success');
           }
         },
         {
@@ -852,15 +963,6 @@ export class PatientProfilePage implements OnInit, OnDestroy {
     this.router.navigate(['/patient/prescriptions']);
   }
 
-  async changePassword() {
-    const alert = await this.alertController.create({
-      header: 'Change Password',
-      message: 'This feature will be available soon. You can reset your password from the login screen.',
-      buttons: ['OK']
-    });
-    await alert.present();
-  }
-
   async logout() {
     const alert = await this.alertController.create({
       header: 'Logout',
@@ -885,15 +987,5 @@ export class PatientProfilePage implements OnInit, OnDestroy {
       ]
     });
     await alert.present();
-  }
-
-  async showToast(message: string, color: string) {
-    const toast = await this.toastController.create({
-      message,
-      duration: 3000,
-      color,
-      position: 'bottom'
-    });
-    await toast.present();
   }
 }

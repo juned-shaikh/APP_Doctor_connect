@@ -1,13 +1,10 @@
-import { Component, NgZone, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { NotificationService } from '../../services/notification.service';
-import { PushNotificationService } from '../../services/push-notification.service';
-import { Subscription } from 'rxjs';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 
 @Component({
-  selector: 'app-patient-tabs',
+  selector: 'app-doctor-tabs',
   standalone: true,
   imports: [CommonModule, IonicModule, RouterLink, RouterLinkActive],
   template: `
@@ -20,11 +17,6 @@ import { Subscription } from 'rxjs';
       >
         <div class="tab-icon-container">
           <span class="material-icons">{{ tab.icon }}</span>
-          <span 
-            *ngIf="tab.path === '/notifications' && unreadCount > 0" 
-            class="notification-badge">
-            {{ unreadCount > 99 ? '99+' : unreadCount }}
-          </span>
         </div>
         <span class="tab-label">{{ tab.label }}</span>
       </a>
@@ -153,46 +145,12 @@ import { Subscription } from 'rxjs';
     `
   ]
 })
-export class PatientTabsComponent implements OnInit, OnDestroy {
-  private router = inject(Router);
-  private ngZone = inject(NgZone);
-  private notificationService = inject(NotificationService);
-  private pushNotificationService = inject(PushNotificationService);
-  
+export class DoctorTabsComponent {
   tabs = [
-    { path: '/patient/dashboard', icon: 'home', label: 'Home' },
-    { path: '/patient/appointments', icon: 'event', label: 'Appointments' },
-    // { path: '/notifications', icon: 'notifications', label: 'Notifications' },
-    { path: '/patient/profile', icon: 'person', label: 'Profile' }
+    { path: '/doctor/dashboard', icon: 'home', label: 'Home' },
+    { path: '/doctor/schedule', icon: 'schedule', label: 'Schedule' },
+    { path: '/doctor/bookings', icon: 'event', label: 'Appointments' },
+    // { path: '/doctor/prescriptions', icon: 'document-text-outline', label: 'Prescriptions' },
+    { path: '/doctor/profile', icon: 'person', label: 'Profile' }
   ];
-
-  unreadCount = 0;
-  private subscriptions: Subscription[] = [];
-
-  constructor() {
-    // Force change detection when route changes to update active tab
-    this.router.events.subscribe(() => {
-      this.ngZone.run(() => {
-        // Trigger change detection
-      });
-    });
-  }
-
-  ngOnInit() {
-    // Subscribe to unread notification count
-    const unreadSub = this.notificationService.getUnreadCount().subscribe(count => {
-      this.unreadCount = count;
-    });
-    this.subscriptions.push(unreadSub);
-
-    // Subscribe to push notification count
-    const pushSub = this.pushNotificationService.getNotificationCount().subscribe(count => {
-      // This could be used for additional badge logic
-    });
-    this.subscriptions.push(pushSub);
-  }
-
-  ngOnDestroy() {
-    this.subscriptions.forEach(sub => sub.unsubscribe());
-  }
 }

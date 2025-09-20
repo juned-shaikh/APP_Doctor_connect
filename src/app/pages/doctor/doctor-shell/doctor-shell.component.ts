@@ -1,11 +1,11 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, Platform } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { PatientTabsComponent } from '../../components/patient-tabs/patient-tabs.component';
+import { DoctorTabsComponent } from '../../../components/doctor-tabs/doctor-tabs.component';
 
 @Component({
-  selector: 'app-patient-shell',
+  selector: 'app-doctor-shell',
   standalone: true,
   imports: [
     CommonModule,
@@ -13,7 +13,7 @@ import { PatientTabsComponent } from '../../components/patient-tabs/patient-tabs
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
-    PatientTabsComponent
+    DoctorTabsComponent
   ],
   template: `
     <ion-app class="safe-top-md">
@@ -21,7 +21,7 @@ import { PatientTabsComponent } from '../../components/patient-tabs/patient-tabs
         <div class="content-wrapper">
           <ion-router-outlet></ion-router-outlet>
         </div>
-        <app-patient-tabs></app-patient-tabs>
+        <app-doctor-tabs></app-doctor-tabs>
       </div>
     </ion-app>
   `,
@@ -107,12 +107,4 @@ import { PatientTabsComponent } from '../../components/patient-tabs/patient-tabs
     }
   `]
 })
-export class PatientShellComponent {
-  private platform = inject(Platform);
-
-  constructor() {
-    this.platform.ready().then(() => {
-      // Add any platform-specific initialization here
-    });
-  }
-}
+export class DoctorShellComponent {}

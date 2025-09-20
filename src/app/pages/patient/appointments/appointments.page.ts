@@ -410,7 +410,38 @@ export class PatientAppointmentsPage implements OnInit {
   }
 
   ngOnInit() {
+    this.overrideBackButton();
     this.loadAppointments();
+  }
+
+  // Override the default back button behavior to ensure navigation to dashboard
+  private overrideBackButton() {
+    // Add a small delay to ensure the back button is properly initialized
+    setTimeout(() => {
+      const backButton = document.querySelector('ion-back-button');
+      if (backButton) {
+        // Remove any existing event listeners
+        backButton.removeEventListener('click', this.handleBackButtonClick.bind(this));
+        // Add our custom event listener
+        backButton.addEventListener('click', this.handleBackButtonClick.bind(this));
+      }
+    }, 100);
+  }
+
+  // Handle back button click event
+  private handleBackButtonClick(event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Check if user is authenticated before navigation
+    const currentUser = this.authService.getCurrentUser();
+    if (currentUser) {
+      // Navigate to patient dashboard
+      this.router.navigate(['/patient/dashboard']);
+    } else {
+      // If not authenticated, go to login
+      this.router.navigate(['/auth/login']);
+    }
   }
 
   async loadAppointments() {

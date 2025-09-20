@@ -6,7 +6,6 @@ import {
   IonRow, IonCol, IonChip, IonLabel, IonBadge, IonItem, IonAvatar, IonButtons,
   ActionSheetController, AlertController
 } from '@ionic/angular/standalone';
-import { AuthService, User } from '../../../services/auth.service';
 import { FirebaseService, AppointmentData } from '../../../services/firebase.service';
 import { AppointmentService } from '../../../services/appointment.service';
 import { addIcons } from 'ionicons';
@@ -18,6 +17,7 @@ import {
 } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
+import { AuthService, User } from 'src/app/services/auth.service';
 
 @Component({
   selector: 'app-doctor-dashboard',
@@ -475,7 +475,7 @@ export class DoctorDashboardPage implements OnInit, OnDestroy {
   rating = 4.8;
   reviewCount = 89;
   notificationCount = 3;
-
+doctorProfile: User | null = null;
   upcomingAppointments: { id: string; patientName: string; time: string; type: string; status: string }[] = [];
 
   private capitalize(status: string): string {
@@ -497,11 +497,17 @@ export class DoctorDashboardPage implements OnInit, OnDestroy {
       settingsOutline, notificationsOutline, starOutline, trendingUpOutline,
       ellipsisVerticalOutline, logOutOutline
     });
+    // Subscribe to current user data
+    this.authService.currentUser$.subscribe(user => {
+      if (user && user.role === 'doctor') {
+        this.doctorProfile = user;
+      }
+    });
   }
 
   ngOnInit() {
     // Subscribe to auth stream so we initialize data streams when user becomes available
-    this.authSub = this.authService.currentUser$.subscribe(user => {
+    this.authSub = this.authService.currentUser$.subscribe((user:any) => {
       this.currentUser = user;
       const uid = user?.uid;
 
@@ -576,9 +582,13 @@ export class DoctorDashboardPage implements OnInit, OnDestroy {
     this.statsMonthSub?.unsubscribe();
   }
 
-  getDoctorSpecialization(): string {
-    // This would come from the user's profile
-    return 'Cardiologist • 10+ years experience';
+getDoctorSpecialization(): string {
+    if (this.doctorProfile) {
+      const specialization = (this.doctorProfile as any)?.specialization || 'Specialization not set';
+      const experience = (this.doctorProfile as any)?.experience ? `${(this.doctorProfile as any).experience} years experience` : '';
+      return `${specialization} • ${experience}`;
+    }
+    return 'Specialization not available';
   }
 
   private getEffectiveVerificationStatus(): 'approved' | 'rejected' | 'under_review' | 'pending' {

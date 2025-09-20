@@ -20,7 +20,7 @@ import {
 import { Auth, User } from '@angular/fire/auth';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject } from '@angular/fire/storage';
 import { Observable, BehaviorSubject, from, map, switchMap, combineLatest } from 'rxjs';
-
+import { getStorage} from 'firebase/storage';
 export interface AppointmentData {
   id?: string;
   doctorId: string;
@@ -293,17 +293,17 @@ export class FirebaseService {
     });
   }
 
-  async updateUserProfile(userId: string, userData: Partial<UserData>): Promise<void> {
-    try {
-      await updateDoc(doc(this.firestore, 'users', userId), {
-        ...userData,
-        updatedAt: new Date()
-      });
-    } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw error;
-    }
-  }
+  // async updateUserProfile(userId: string, userData: Partial<UserData>): Promise<void> {
+  //   try {
+  //     await updateDoc(doc(this.firestore, 'users', userId), {
+  //       ...userData,
+  //       updatedAt: new Date()
+  //     });
+  //   } catch (error) {
+  //     console.error('Error updating user profile:', error);
+  //     throw error;
+  //   }
+  // }
 
   getUserById(userId: string): Observable<UserData | null> {
     const userRef = doc(this.firestore, 'users', userId);
@@ -548,11 +548,16 @@ export class FirebaseService {
   }
 
   // File Upload
-  async uploadFile(file: File, path: string): Promise<string> {
-    const fileRef = ref(this.storage, path);
-    const snapshot = await uploadBytes(fileRef, file);
-    return await getDownloadURL(snapshot.ref);
-  }
+async uploadFile(file: File, path: string): Promise<string> {
+  const storage = getStorage();              // modular entry point
+  const storageRef = ref(storage, path);     // create reference
+  await uploadBytes(storageRef, file);     // upload
+  return await getDownloadURL(storageRef); // get public URL
+}
+async updateUserProfile(uid: string, data: Partial<UserData>) {
+  const userDoc = doc(this.firestore, 'users', uid);
+  return updateDoc(userDoc, data);
+}
 
   async deleteFile(path: string): Promise<void> {
     const fileRef = ref(this.storage, path);

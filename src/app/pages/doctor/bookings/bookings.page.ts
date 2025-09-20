@@ -47,31 +47,7 @@ import { Subscription } from 'rxjs';
 
       <div class="bookings-container">
         <!-- Stats Overview -->
-        <div class="stats-overview">
-          <ion-card class="stats-card">
-            <ion-card-content>
-              <div class="stats-grid">
-                <div class="stat-item">
-                  <h3>{{ todayBookings }}</h3>
-                  <p>Today</p>
-                </div>
-                <div class="stat-item">
-                  <h3>{{ pendingApprovals }}</h3>
-                  <p>Pending</p>
-                  <ion-badge *ngIf="pendingApprovals > 0" color="warning">{{ pendingApprovals }}</ion-badge>
-                </div>
-                <div class="stat-item">
-                  <h3>{{ weeklyBookings }}</h3>
-                  <p>This Week</p>
-                </div>
-                <div class="stat-item">
-                  <h3>₹{{ weeklyRevenue }}</h3>
-                  <p>Revenue</p>
-                </div>
-              </div>
-            </ion-card-content>
-          </ion-card>
-        </div>
+       
 
         <!-- Filter Segment -->
         <ion-segment [(ngModel)]="selectedFilter" (ionChange)="onFilterChange($event)" class="auth-segment">

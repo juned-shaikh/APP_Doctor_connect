@@ -143,18 +143,21 @@ interface DashboardDoctor {
                         <span>{{ (doctor.rating || 0) | number:'1.1-1' }}</span>
                       </div>
                     </div>
-                <!--    // <div class="sub-line">
-                    //   <ion-icon name="location-outline"></ion-icon>
-                    //   <span class="truncate">{{ getDoctorLocation(doctor) }}</span>
-                    // </div>
-                    // <div class="sub-line">
+                    <div style="display: flex; ">
+                    <div class="sub-line">
+                      <ion-icon name="location-outline"></ion-icon>
+                      <span class="truncate">{{ getDoctorLocation(doctor) }}</span>
+                    </div>
+                  <!--  // <div class="sub-line">
                     //   <ion-icon name="briefcase-outline"></ion-icon>
                     //   <span>{{ getExperienceYears(doctor) }}</span>
-                    // </div>
-                    // <div class="sub-line">
-                    //   <ion-icon name="pricetag-outline"></ion-icon>
-                    //   <span>{{ getConsultationFeeText(doctor) }}</span>
                     // </div>-->
+                    <div class="sub-line" style="margin-left: 10px;">
+                      <ion-icon name="pricetag-outline"></ion-icon>
+                      <span>{{ getConsultationFeeText(doctor) }}</span>
+                    </div>
+                    </div>
+                    
                   </div>
                 </div>
                 <div class="card-actions">
@@ -504,7 +507,7 @@ interface DashboardDoctor {
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 6px;
+      // margin-bottom: 6px;
     }
     .title-left {
       display: flex;

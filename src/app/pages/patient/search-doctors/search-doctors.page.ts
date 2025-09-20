@@ -1,11 +1,11 @@
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { 
   IonContent, IonHeader, IonTitle, IonToolbar, IonSearchbar, IonCard, 
   IonCardContent, IonButton, IonIcon, IonText, IonChip, IonLabel,
   IonItem, IonAvatar, IonBadge, IonGrid, IonRow, IonCol, IonSelect,
-  IonSelectOption, IonRange, IonCheckbox, IonModal, IonButtons
+  IonSelectOption, IonRange, IonCheckbox, IonModal, IonButtons,IonBackButton
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -41,6 +41,9 @@ interface Doctor {
     <ion-content>
       <ion-header [translucent]="true">
         <ion-toolbar>
+         <ion-buttons slot="start">
+          <ion-back-button defaultHref="/patient/dashboard"></ion-back-button>
+        </ion-buttons>
           <ion-title>Find Doctors</ion-title>
           <ion-button slot="end" fill="clear" (click)="openFilters()">
             <ion-icon name="filter-outline"></ion-icon>
@@ -158,7 +161,7 @@ interface Doctor {
                   <ion-button fill="outline" size="small" (click)="bookAppointment(doctor.id); $event.stopPropagation()">
                     Book Appointment
                   </ion-button>
-                  <ion-button fill="clear" size="small" (click)="viewDoctorDetails(doctor.id); $event.stopPropagation()">
+                  <ion-button fill="clear" size="small" (click)="viewDoctorDetails(doctor.id); $event.stopPropagation()" style="color:white;">
                     View Profile
                   </ion-button>
                 </div>
@@ -452,7 +455,7 @@ interface Doctor {
     }
   `],
   imports: [
-    CommonModule, ReactiveFormsModule, FormsModule,
+    CommonModule, ReactiveFormsModule, FormsModule,IonBackButton,
     IonContent, IonHeader, IonTitle, IonToolbar, IonSearchbar, IonCard, 
     IonCardContent, IonButton, IonIcon, IonText, IonChip, IonLabel,
     IonItem, IonAvatar, IonBadge, IonGrid, IonRow, IonCol, IonSelect,
@@ -460,11 +463,14 @@ interface Doctor {
   ],
   standalone: true
 })
-export class SearchDoctorsPage implements OnInit {
+export class SearchDoctorsPage implements OnInit, OnDestroy {
   searchControl = new FormControl('');
+  searchQuery = '';
   showFilters = false;
   selectedSpecialization = '';
   private doctorsSub?: Subscription;
+  private searchSubscription?: Subscription;
+  private route = inject(ActivatedRoute);
 
   popularSpecializations = [
     'Cardiology', 'Dermatology', 'Pediatrics', 'Orthopedics', 'Neurology'
@@ -497,7 +503,24 @@ export class SearchDoctorsPage implements OnInit {
   }
 
   ngOnInit() {
-    // Subscribe to live registered doctors (approved + active)
+    // Call setupSearch first to initialize the search subscription
+    this.setupSearch();
+    
+    // Handle query params first
+    this.route.queryParams.subscribe((params: { [key: string]: any }) => {
+      if (params['q']) {
+        this.searchQuery = params['q'];
+        this.searchControl.setValue(this.searchQuery);
+      }
+      
+      if (params['specialization']) {
+        this.filters.specialization = params['specialization'];
+      }
+      
+      this.applyFilters();
+    });
+
+    // Then load doctors
     this.doctorsSub = this.firebaseService.getUsersByRole('doctor').subscribe((users: UserData[]) => {
       const approvedActive = users.filter(u => u.isActive);
       this.doctors = approvedActive.map(u => ({
@@ -521,22 +544,27 @@ export class SearchDoctorsPage implements OnInit {
       this.filterDoctors();
     });
     this.setupSearch();
+    
+    // Subscribe to query params
+    this.route.queryParams.subscribe(params => {
+      if (params['q']) {
+        this.searchQuery = params['q'];
+        this.searchControl.setValue(this.searchQuery);
+        this.applyFilters();
+      }
+      
+      if (params['specialization']) {
+        this.filters.specialization = params['specialization'];
+        this.applyFilters();
+      }
+    });
   }
 
   ngOnDestroy() {
     this.doctorsSub?.unsubscribe();
+    this.searchSubscription?.unsubscribe();
   }
 
-  setupSearch() {
-    this.searchControl.valueChanges
-      .pipe(
-        debounceTime(300),
-        distinctUntilChanged()
-      )
-      .subscribe(searchTerm => {
-        this.filterDoctors();
-      });
-  }
 
   selectSpecialization(specialization: string) {
     if (this.selectedSpecialization === specialization) {
@@ -544,21 +572,47 @@ export class SearchDoctorsPage implements OnInit {
     } else {
       this.selectedSpecialization = specialization;
     }
-    this.filterDoctors();
+    this.applyFilters();
+  }
+
+  private setupSearch() {
+    // Unsubscribe from any existing subscription
+    if (this.searchSubscription) {
+      this.searchSubscription.unsubscribe();
+    }
+    
+    // Set up new subscription with proper type safety
+    this.searchSubscription = this.searchControl.valueChanges.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe((query: string | null) => {
+      this.searchQuery = query || '';
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { 
+          q: this.searchQuery || undefined,
+          specialization: this.filters.specialization || undefined 
+        },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+      this.applyFilters();
+    });
   }
 
   filterDoctors() {
-    const searchTerm = this.searchControl.value?.toLowerCase() || '';
+    const searchTerm = this.searchQuery.toLowerCase();
     
-    this.filteredDoctors = this.doctors.filter(doctor => {
+    this.filteredDoctors = this.doctors.filter((doctor: Doctor) => {
       // Search term filter
       const matchesSearch = !searchTerm || 
-        doctor.name.toLowerCase().includes(searchTerm) ||
-        doctor.specialization.toLowerCase().includes(searchTerm);
+        (doctor.name?.toLowerCase() || '').includes(searchTerm) ||
+        (doctor.specialization?.toLowerCase() || '').includes(searchTerm) ||
+        (doctor.qualifications?.some(q => q.toLowerCase().includes(searchTerm)) || false);
 
       // Specialization filter
-      const matchesSpecialization = !this.selectedSpecialization || 
-        doctor.specialization === this.selectedSpecialization;
+      const matchesSpecialization = !this.filters.specialization || 
+        doctor.specialization === this.filters.specialization;
 
       // Location filter
       const matchesLocation = !this.filters.location || 
@@ -575,13 +629,52 @@ export class SearchDoctorsPage implements OnInit {
       // Online only filter
       const matchesOnline = !this.filters.onlineOnly || doctor.isOnline;
 
-      // Specialization from filters
-      const matchesFilterSpecialization = !this.filters.specialization || 
-        doctor.specialization === this.filters.specialization;
-
       return matchesSearch && matchesSpecialization && matchesLocation && 
-             matchesFee && matchesRating && matchesOnline && matchesFilterSpecialization;
+             matchesFee && matchesRating && matchesOnline;
     });
+  }
+
+  applyFilters() {
+    let filtered = [...this.doctors];
+    
+    // Apply search filter
+    if (this.searchQuery) {
+      const query = this.searchQuery.toLowerCase();
+      filtered = filtered.filter(doctor => 
+        (doctor.name?.toLowerCase().includes(query) ||
+        doctor.specialization?.toLowerCase().includes(query) ||
+        doctor.qualifications?.some(q => q.toLowerCase().includes(query)))
+      );
+    }
+    
+    // Apply specialization filter if any
+    if (this.filters.specialization) {
+      filtered = filtered.filter(doctor => 
+        doctor.specialization?.toLowerCase() === this.filters.specialization.toLowerCase()
+      );
+    }
+
+    // Apply other filters
+    filtered = filtered.filter(doctor => {
+      // Location filter
+      const matchesLocation = !this.filters.location || 
+        doctor.location === this.filters.location;
+
+      // Fee filter
+      const matchesFee = !this.filters.maxFee || 
+        doctor.consultationFee <= this.filters.maxFee;
+
+      // Rating filter
+      const matchesRating = !this.filters.minRating || 
+        doctor.rating >= this.filters.minRating;
+
+      // Online only filter
+      const matchesOnline = !this.filters.onlineOnly || doctor.isOnline;
+
+      return matchesLocation && matchesFee && matchesRating && matchesOnline;
+    });
+
+    this.filteredDoctors = filtered;
   }
 
   hasActiveFilters(): boolean {
@@ -608,7 +701,7 @@ export class SearchDoctorsPage implements OnInit {
         this.filters.specialization = '';
         break;
     }
-    this.filterDoctors();
+    this.applyFilters();
   }
 
   clearAllFilters() {
@@ -622,7 +715,7 @@ export class SearchDoctorsPage implements OnInit {
     };
     this.selectedSpecialization = '';
     this.searchControl.setValue('');
-    this.filterDoctors();
+    this.applyFilters();
   }
 
   openFilters() {
@@ -631,11 +724,6 @@ export class SearchDoctorsPage implements OnInit {
 
   closeFilters() {
     this.showFilters = false;
-  }
-
-  applyFilters() {
-    this.filterDoctors();
-    this.closeFilters();
   }
 
   viewDoctorDetails(doctorId: string) {

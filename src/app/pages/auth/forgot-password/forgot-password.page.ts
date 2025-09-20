@@ -9,6 +9,7 @@ import {
 import { addIcons } from 'ionicons';
 import { mailOutline, arrowBackOutline } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
+import { AuthService } from '../../../services/auth.service';
 
 @Component({
   selector: 'app-forgot-password',
@@ -140,7 +141,8 @@ export class ForgotPasswordPage implements OnInit {
   constructor(
     private fb: FormBuilder,
     private router: Router,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private authService: AuthService
   ) {
     addIcons({ mailOutline, arrowBackOutline });
   }
@@ -166,11 +168,10 @@ export class ForgotPasswordPage implements OnInit {
     try {
       const email = this.forgotPasswordForm.get('email')?.value;
       
-      // TODO: Implement actual password reset functionality with Firebase
-      // For now, we'll simulate the process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the auth service to send password reset email
+      await this.authService.forgotPassword(email);
       
-      this.showToast('Password reset link sent to your email!', 'success');
+      this.showToast('Password reset link sent to your email! Please check your inbox.', 'success');
       this.router.navigate(['/auth/login']);
 
     } catch (error: any) {

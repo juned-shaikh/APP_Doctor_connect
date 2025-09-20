@@ -486,24 +486,40 @@ export class BookAppointmentPage implements OnInit {
         updatedAt: new Date()
       };
       
+      console.log('Saving appointment:', appointmentData);
+      
       // Save to Firebase
       await this.appointmentService.bookAppointment(appointmentData);
       
       const toast = await this.toastController.create({
         message: 'Appointment booked successfully!',
-        duration: 3000,
-        color: 'success'
+        duration: 2000,
+        color: 'success',
+        position: 'top'
       });
-      await toast.present();
-
-      // Navigate back to patient dashboard
-      this.router.navigate(['/patient/dashboard']);
       
-    } catch (error) {
+      await toast.present();
+      
+      // Wait for toast to be dismissed before navigating
+      setTimeout(() => {
+        this.router.navigate(['/patient/dashboard'], { 
+          replaceUrl: true 
+        }).catch(err => {
+          console.error('Navigation error:', err);
+          // Fallback to root if navigation fails
+          this.router.navigate(['/']);
+        });
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('Error confirming booking:', error);
+      const errorMessage = error.message || 'Failed to book appointment. Please try again.';
+      
       const toast = await this.toastController.create({
-        message: 'Failed to book appointment. Please try again.',
+        message: errorMessage,
         duration: 3000,
-        color: 'danger'
+        color: 'danger',
+        position: 'top'
       });
       await toast.present();
     } finally {
