@@ -8,6 +8,7 @@ import {
   deleteDoc, 
   getDocs, 
   getDoc, 
+  setDoc,
   query, 
   where, 
   orderBy, 
@@ -775,25 +776,35 @@ async updateUserProfile(uid: string, data: Partial<UserData>) {
 
   // Video Call Methods
   async setCallOffer(callId: string, offer: RTCSessionDescriptionInit): Promise<void> {
-    const callRef = doc(this.firestore, 'videoCalls', callId);
-    await updateDoc(callRef, {
-      offer: {
-        type: offer.type,
-        sdp: offer.sdp
-      },
-      updatedAt: Timestamp.now()
-    });
+    try {
+      const callRef = doc(this.firestore, 'videoCalls', callId);
+      await updateDoc(callRef, {
+        offer: {
+          type: offer.type,
+          sdp: offer.sdp
+        },
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error setting call offer:', error);
+      throw new Error('Failed to set call offer. Please check Firestore permissions.');
+    }
   }
 
   async setCallAnswer(callId: string, answer: RTCSessionDescriptionInit): Promise<void> {
-    const callRef = doc(this.firestore, 'videoCalls', callId);
-    await updateDoc(callRef, {
-      answer: {
-        type: answer.type,
-        sdp: answer.sdp
-      },
-      updatedAt: Timestamp.now()
-    });
+    try {
+      const callRef = doc(this.firestore, 'videoCalls', callId);
+      await updateDoc(callRef, {
+        answer: {
+          type: answer.type,
+          sdp: answer.sdp
+        },
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error setting call answer:', error);
+      throw new Error('Failed to set call answer. Please check Firestore permissions.');
+    }
   }
 
   getCallOffer(callId: string): Observable<RTCSessionDescriptionInit | null> {
@@ -827,18 +838,25 @@ async updateUserProfile(uid: string, data: Partial<UserData>) {
   }
 
   async addIceCandidate(callId: string, candidate: RTCIceCandidate): Promise<void> {
-    const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
-    await addDoc(candidatesRef, {
-      candidate: candidate.candidate,
-      sdpMLineIndex: candidate.sdpMLineIndex,
-      sdpMid: candidate.sdpMid,
-      createdAt: Timestamp.now()
-    });
+    try {
+      const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
+      await addDoc(candidatesRef, {
+        candidate: candidate.candidate,
+        sdpMLineIndex: candidate.sdpMLineIndex,
+        sdpMid: candidate.sdpMid,
+        createdAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error adding ICE candidate:', error);
+      // Don't throw error for ICE candidates as they're not critical
+    }
   }
 
   getIceCandidates(callId: string): Observable<RTCIceCandidateInit[]> {
     const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
     const q = query(candidatesRef, orderBy('createdAt', 'asc'));
+    
+    let lastCandidateCount = 0;
     
     return new Observable(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -847,23 +865,61 @@ async updateUserProfile(uid: string, data: Partial<UserData>) {
           sdpMLineIndex: doc.data()['sdpMLineIndex'],
           sdpMid: doc.data()['sdpMid']
         }));
-        observer.next(candidates);
+        
+        // Only emit new candidates to avoid processing duplicates
+        if (candidates.length > lastCandidateCount) {
+          const newCandidates = candidates.slice(lastCandidateCount);
+          lastCandidateCount = candidates.length;
+          observer.next(newCandidates);
+        }
       });
       return unsubscribe;
     });
   }
 
   async createVideoCall(appointmentId: string, doctorId: string, patientId: string): Promise<string> {
-    const callsRef = collection(this.firestore, 'videoCalls');
-    const docRef = await addDoc(callsRef, {
-      appointmentId,
-      doctorId,
-      patientId,
-      status: 'waiting',
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    });
-    return docRef.id;
+    const callId = `call_${appointmentId}`;
+    const callRef = doc(this.firestore, 'videoCalls', callId);
+    
+    console.log('Creating video call:', { callId, appointmentId, doctorId, patientId });
+    
+    try {
+      // Use setDoc to create or update the document with the specific ID
+      await setDoc(callRef, {
+        appointmentId,
+        doctorId,
+        patientId,
+        status: 'waiting',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      }, { merge: true });
+      
+      console.log('Video call document created successfully');
+      
+      // Clear any existing signaling data from previous calls
+      try {
+        // Clear ICE candidates
+        const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
+        const candidatesSnapshot = await getDocs(candidatesRef);
+        const deletePromises = candidatesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        
+        // Clear offer and answer
+        await updateDoc(callRef, {
+          offer: null,
+          answer: null
+        });
+        
+        console.log('Cleared existing signaling data');
+      } catch (error) {
+        console.log('No existing signaling data to clear:', error);
+      }
+      
+      return callId;
+    } catch (error) {
+      console.error('Error creating video call:', error);
+      throw error;
+    }
   }
 
   async endCall(callId: string): Promise<void> {

@@ -11,6 +11,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FirebaseService } from '../../services/firebase.service';
 import { AuthService } from '../../services/auth.service';
+import { doc, setDoc } from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-video-demo',
@@ -54,7 +55,7 @@ export class VideoDemoPage implements OnInit {
         return;
       }
 
-      // Create a demo video appointment
+      // Create a demo video appointment with the specific ID
       const appointmentData = {
         doctorId: 'demo-doctor-id',
         doctorName: 'Dr. Demo Doctor',
@@ -75,7 +76,12 @@ export class VideoDemoPage implements OnInit {
         updatedAt: new Date()
       };
 
-      await this.firebaseService.createAppointment(appointmentData);
+      // Create appointment with specific ID
+      const appointmentRef = doc(this.firebaseService['firestore'], 'appointments', this.appointmentId);
+      await setDoc(appointmentRef, appointmentData);
+      
+      // Create video call document
+      await this.firebaseService.createVideoCall(this.appointmentId, 'demo-doctor-id', currentUser.uid);
       
       this.showToast('Demo appointment created! Joining video call...', 'success');
       
@@ -86,7 +92,7 @@ export class VideoDemoPage implements OnInit {
 
     } catch (error) {
       console.error('Error creating demo appointment:', error);
-      this.showToast('Failed to create demo appointment', 'danger');
+      this.showToast('Failed to create demo appointment: ' + (error as any).message, 'danger');
     } finally {
       this.isCreating = false;
     }

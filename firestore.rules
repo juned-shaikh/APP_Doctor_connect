@@ -137,6 +137,20 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (isAdmin() || isOwner(doctorId));
     }
     
+    // Video calls collection rules (simplified for development)
+    match /videoCalls/{callId} {
+      // Allow all authenticated users to read/write video calls for now
+      // TODO: Restrict to specific doctor/patient in production
+      allow read, write, create, update, delete: if isAuthenticated();
+      
+      // ICE candidates subcollection
+      match /iceCandidates/{candidateId} {
+        // Allow all authenticated users to read/write ICE candidates for now
+        // TODO: Restrict to specific doctor/patient in production
+        allow read, write, create, update, delete: if isAuthenticated();
+      }
+    }
+    
     // Allow admin to read all collections for analytics and management
     match /{document=**} {
       allow read: if isAdmin();

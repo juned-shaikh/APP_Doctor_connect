@@ -46,4 +46,9 @@ export const routes: Routes = [
     path: 'video-demo',
     loadComponent: () => import('./pages/video-demo/video-demo.page').then(m => m.VideoDemoPage)
   },
+  {
+    path: 'debug-google',
+    loadComponent: () => import('./debug-google-signin.component').then(m => m.DebugGoogleSigninComponent)
+  },
+
 ];

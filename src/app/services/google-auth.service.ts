@@ -32,7 +32,7 @@ export class GoogleAuthService {
         await GoogleAuth.initialize({
           clientId: '1041888734011-tivpcn8efo5723ks6q6vs1rh8e87teh2.apps.googleusercontent.com',
           scopes: ['profile', 'email'],
-          grantOfflineAccess: false, // Set to false to avoid token refresh issues
+          grantOfflineAccess: true,
         });
         console.log('Google Auth initialized successfully');
       } catch (error) {
@@ -111,11 +111,33 @@ export class GoogleAuthService {
 
   async signInWithFirebase(): Promise<any> {
     try {
+      console.log('🔍 Debug Info:');
+      console.log('Platform:', this.platform.platforms());
+      console.log('Is Capacitor:', this.platform.is('capacitor'));
+      console.log('Is Android:', this.platform.is('android'));
+      console.log('Is iOS:', this.platform.is('ios'));
+      
       if (this.platform.is('capacitor')) {
+        console.log('📱 Starting mobile Google Sign-In...');
+        
+        // Test Google Auth plugin
+        try {
+          console.log('Google Auth plugin loaded and ready');
+        } catch (availError) {
+          console.warn('Google Auth plugin issue:', availError);
+        }
+        
         // For mobile, get the Google Auth result
         console.log('Getting Google Auth result for mobile Firebase sign-in...');
         const result = await GoogleAuth.signIn();
-        console.log('Raw Google Auth result:', result);
+        console.log('✅ Google Auth successful:', {
+          id: result.id,
+          email: result.email,
+          name: result.name,
+          hasIdToken: !!result.authentication?.idToken,
+          hasAccessToken: !!result.authentication?.accessToken,
+          idTokenLength: result.authentication?.idToken?.length || 0
+        });
         
         // Validate that we have the required tokens
         if (!result.authentication?.idToken) {
@@ -151,11 +173,15 @@ export class GoogleAuthService {
         return result;
       }
     } catch (error: any) {
-      console.error('Firebase Google Sign-In error:', error);
-      console.error('Error details:', {
-        code: error.code,
+      console.error('❌ Firebase Google Sign-In error:', error);
+      console.error('❌ Detailed Error Info:', {
         message: error.message,
-        customData: error.customData
+        code: error.code,
+        stack: error.stack,
+        customData: error.customData,
+        platform: this.platform.platforms(),
+        timestamp: new Date().toISOString(),
+        fullError: JSON.stringify(error, null, 2)
       });
       
       // Handle specific Firebase auth errors

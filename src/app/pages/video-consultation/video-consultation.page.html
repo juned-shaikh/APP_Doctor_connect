@@ -1,7 +1,9 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/"></ion-back-button>
+      <ion-button fill="clear" (click)="goBack()">
+        <ion-icon name="arrow-back" slot="icon-only"></ion-icon>
+      </ion-button>
     </ion-buttons>
     <ion-title>Video Consultation</ion-title>
   </ion-toolbar>
@@ -20,14 +22,10 @@
   <div class="video-container">
     <!-- Remote Video (Main) -->
     <div class="remote-video-container">
-      <video 
-        #remoteVideo 
-        autoplay 
-        playsinline
-        [class.hidden]="!callState.remoteStream"
+      <video #remoteVideo autoplay playsinline muted="false" controls="false" [class.hidden]="!callState.remoteStream"
         class="remote-video">
       </video>
-      
+
       <!-- Placeholder when no remote stream -->
       <div class="video-placeholder" *ngIf="!callState.remoteStream">
         <ion-icon name="person-circle" size="large"></ion-icon>
@@ -39,15 +37,10 @@
 
     <!-- Local Video (Picture-in-Picture) -->
     <div class="local-video-container" *ngIf="callState.localStream">
-      <video 
-        #localVideo 
-        autoplay 
-        playsinline 
-        muted
-        class="local-video"
+      <video #localVideo autoplay playsinline muted="true" controls="false" class="local-video"
         [class.video-off]="!isVideoEnabled">
       </video>
-      
+
       <!-- Video off indicator -->
       <div class="video-off-indicator" *ngIf="!isVideoEnabled">
         <ion-icon name="videocam-off"></ion-icon>
@@ -56,43 +49,98 @@
   </div>
 
   <!-- Loading State -->
-  <div class="loading-container" *ngIf="callState.isConnecting && !callState.localStream">
-    <ion-spinner name="crescent"></ion-spinner>
-    <ion-text>
-      <p>Initializing video call...</p>
-    </ion-text>
+  <div class="loading-container" *ngIf="callState.isConnecting">
+    <div class="loading-content">
+      <ion-spinner name="crescent" color="primary"></ion-spinner>
+      <h3>Connecting...</h3>
+      <p>Setting up your video call</p>
+    </div>
   </div>
 
   <!-- Controls -->
   <div class="controls-container" *ngIf="showVideoControls">
     <div class="controls">
       <!-- Audio Toggle -->
-      <ion-button 
-        fill="solid" 
-        shape="round" 
-        [color]="isAudioEnabled ? 'medium' : 'danger'"
-        (click)="toggleAudio()">
+      <ion-button fill="solid" shape="round" [color]="isAudioEnabled ? 'medium' : 'danger'" (click)="toggleAudio()">
         <ion-icon [name]="isAudioEnabled ? 'mic' : 'mic-off'" slot="icon-only"></ion-icon>
       </ion-button>
 
       <!-- Video Toggle -->
-      <ion-button 
-        fill="solid" 
-        shape="round" 
-        [color]="isVideoEnabled ? 'medium' : 'danger'"
-        (click)="toggleVideo()">
+      <ion-button fill="solid" shape="round" [color]="isVideoEnabled ? 'medium' : 'danger'" (click)="toggleVideo()">
         <ion-icon [name]="isVideoEnabled ? 'videocam' : 'videocam-off'" slot="icon-only"></ion-icon>
       </ion-button>
 
       <!-- End Call -->
-      <ion-button 
-        fill="solid" 
-        shape="round" 
-        color="danger"
-        (click)="endCall()">
+      <ion-button fill="solid" shape="round" color="danger" (click)="endCall()">
         <ion-icon name="call" slot="icon-only"></ion-icon>
       </ion-button>
     </div>
+
+    <!-- Doctor Actions -->
+    <div class="doctor-actions" *ngIf="isDoctor">
+      <ion-button fill="solid" expand="block" color="success" class="complete-btn" (click)="markAppointmentCompleted()">
+        <ion-icon name="checkmark-circle" slot="start"></ion-icon>
+        Mark as Present & Complete
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Permission Request -->
+  <div class="permission-container" *ngIf="!callState.isInCall && !callState.isConnecting && !callState.error">
+    <ion-card class="start-call-card">
+      <ion-card-content class="text-center">
+        <div class="call-icon">
+          <ion-icon name="videocam" size="large" color="primary"></ion-icon>
+        </div>
+        <h2>Video Consultation</h2>
+        <p class="participant-info" *ngIf="participantName">
+          {{ isDoctor ? 'Patient' : 'Doctor' }}: <strong>{{ participantName }}</strong>
+        </p>
+
+        <ion-button expand="block" size="large" class="start-call-btn" (click)="requestPermissionsAndStart()">
+          <ion-icon name="videocam" slot="start"></ion-icon>
+          {{ hasCallEnded ? 'Rejoin Video Call' : 'Start Video Call' }}
+        </ion-button>
+
+        <!-- Show helpful message if call ended -->
+        <p *ngIf="hasCallEnded && isDoctor" class="rejoin-message">
+          <ion-text color="medium">
+            <small>Call ended? No problem! You can rejoin anytime or mark the patient as present below.</small>
+          </ion-text>
+        </p>
+
+        <!-- Mobile troubleshooting for rejoin issues -->
+        <div *ngIf="hasCallEnded && callState.isInCall && !callState.remoteStream" class="mobile-troubleshoot">
+          <ion-text color="warning">
+            <small>Having trouble seeing the other person? Try refreshing the connection:</small>
+          </ion-text>
+          <ion-button fill="clear" size="small" (click)="forceRefreshVideo()">
+            <ion-icon name="refresh" slot="start"></ion-icon>
+            Refresh Video
+          </ion-button>
+        </div>
+
+        <!-- Doctor can mark as present even without rejoining -->
+        <div *ngIf="isDoctor && hasCallEnded" class="complete-without-call">
+          <ion-button fill="outline" expand="block" color="success" (click)="markAppointmentCompleted()">
+            <ion-icon name="checkmark-circle" slot="start"></ion-icon>
+            Mark as Present (Complete Appointment)
+          </ion-button>
+        </div>
+
+        <!-- Quick settings for permission issues -->
+        <div *ngIf="isNativeApp && !permissionStatus.hasPermissions" class="quick-actions">
+          <ion-button fill="clear" size="small" (click)="openNativeSettings()">
+            <ion-icon name="settings" slot="start"></ion-icon>
+            Settings
+          </ion-button>
+          <ion-button fill="clear" size="small" (click)="refreshPermissions()">
+            <ion-icon name="refresh" slot="start"></ion-icon>
+            Refresh
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
   </div>
 
   <!-- Error State -->
@@ -103,9 +151,36 @@
           <h3>Connection Error</h3>
           <p>{{ callState.error }}</p>
         </ion-text>
-        <ion-button fill="outline" (click)="router.navigate(['/'])">
+        <ion-button fill="outline" (click)="router.navigate([isDoctor ? '/doctor/dashboard' : '/patient/dashboard'])">
           Go Back
         </ion-button>
+        <ion-button fill="solid" (click)="requestPermissionsAndStart()"
+          *ngIf="callState.error && (callState.error.includes('denied') || callState.error.includes('Permission'))">
+          <ion-icon name="videocam" slot="start"></ion-icon>
+          Try Again
+        </ion-button>
+        <ion-button fill="outline" (click)="showPermissionHelp()"
+          *ngIf="callState.error && (callState.error.includes('denied') || callState.error.includes('Permission'))">
+          <ion-icon name="help-circle" slot="start"></ion-icon>
+          Permission Help
+        </ion-button>
+        <!-- Advanced options (collapsed by default) -->
+        <ion-button fill="clear" size="small" (click)="showAdvancedOptions = !showAdvancedOptions"
+          *ngIf="callState.error">
+          <ion-icon name="chevron-down" slot="start"></ion-icon>
+          Advanced Options
+        </ion-button>
+
+        <div *ngIf="showAdvancedOptions && callState.error" class="advanced-options">
+          <ion-button fill="clear" size="small" (click)="debugPermissions()">
+            <ion-icon name="bug" slot="start"></ion-icon>
+            Debug Info
+          </ion-button>
+          <ion-button fill="clear" size="small" (click)="showResetInstructions()">
+            <ion-icon name="refresh" slot="start"></ion-icon>
+            Reset Site
+          </ion-button>
+        </div>
       </ion-card-content>
     </ion-card>
   </div>
