@@ -13,6 +13,13 @@ export interface PushNotificationData {
   badge?: number;
 }
 
+export interface SendPushNotificationData {
+  userId: string;
+  title: string;
+  body: string;
+  data?: any;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -187,6 +194,24 @@ export class PushNotificationService {
 
     // This would typically be sent from your backend
     console.log('Test notification would be sent from backend');
+  }
+
+  async sendPushNotification(notificationData: SendPushNotificationData) {
+    try {
+      // In a real implementation, this would call your backend API
+      // which would then use FCM to send the push notification
+      console.log('Sending push notification:', notificationData);
+      
+      // Example implementation that would be done on the backend:
+      // 1. Get the user's FCM token from your database
+      // 2. Use the FCM Admin SDK to send the notification
+      // 3. Handle any errors
+      
+      // For now, we'll just log it
+      console.log(`Would send push notification to user ${notificationData.userId}: ${notificationData.title}`);
+    } catch (error) {
+      console.error('Error sending push notification:', error);
+    }
   }
 
   // Badge management

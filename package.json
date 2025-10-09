@@ -29,6 +29,7 @@
     "@capacitor/device": "^7.0.2",
     "@capacitor/haptics": "7.0.2",
     "@capacitor/keyboard": "7.0.2",
+    "@capacitor/local-notifications": "^7.0.3",
     "@capacitor/push-notifications": "^7.0.2",
     "@capacitor/status-bar": "7.0.2",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",

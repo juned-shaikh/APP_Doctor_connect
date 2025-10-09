@@ -20,6 +20,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../services/auth.service';
 import { FirebaseService, AppointmentData } from '../../../services/firebase.service';
 import { AppointmentService } from '../../../services/appointment.service';
+import { LocalNotificationService } from '../../../services/local-notification.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -405,6 +406,7 @@ export class DoctorBookingsPage implements OnInit {
   selectedFilter = 'all';
   isLoading = true;
   private bookingsSub?: Subscription;
+  private previousBookingIds: Set<string> = new Set(); // Track existing bookings
 
   // Stats
   todayBookings = 0;
@@ -419,7 +421,8 @@ export class DoctorBookingsPage implements OnInit {
     private alertController: AlertController,
     private toastController: ToastController,
     private firebaseService: FirebaseService,
-    private appointmentService: AppointmentService
+    private appointmentService: AppointmentService,
+    private localNotificationService: LocalNotificationService
   ) {
     addIcons({
       calendarOutline, timeOutline, personOutline, callOutline,
@@ -458,7 +461,36 @@ export class DoctorBookingsPage implements OnInit {
     this.bookingsSub?.unsubscribe();
     this.bookingsSub = this.firebaseService.getAppointmentsByDoctor(doctorUid).subscribe({
       next: (appointments) => {
-        console.log('Appointments received:', appointments.length);
+        console.log('[DoctorBookingsPage] 📝 Appointments received:', appointments.length);
+        
+        // Check for new appointments and send notifications
+        if (this.previousBookingIds.size > 0) {
+          // Not the first load, check for new appointments
+          appointments.forEach(appointment => {
+            if (appointment.id && !this.previousBookingIds.has(appointment.id)) {
+              console.log('[DoctorBookingsPage] 🆕 New appointment detected:', appointment.id);
+              console.log('[DoctorBookingsPage] 📋 Appointment details:', {
+                patientName: appointment.patientName,
+                date: appointment.date,
+                time: appointment.time,
+                status: appointment.status
+              });
+              
+              // Send local notification for new appointment
+              this.localNotificationService.sendNewAppointmentNotificationToDoctor(appointment)
+                .then(() => {
+                  console.log('[DoctorBookingsPage] ✅ Notification sent successfully');
+                })
+                .catch((error) => {
+                  console.error('[DoctorBookingsPage] ❌ Error sending notification:', error);
+                });
+            }
+          });
+        }
+        
+        // Update the tracking set with current appointment IDs
+        this.previousBookingIds = new Set(appointments.map(a => a.id).filter((id): id is string => !!id));
+        
         this.bookings = appointments;
         this.calculateStats();
         this.filterBookings();

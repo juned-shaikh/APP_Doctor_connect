@@ -15,7 +15,7 @@
       },
       "oauth_client": [
         {
-          "client_id": "1041888734011-p2e1l2if9dkhvmhm9122oumlnprpmrk5.apps.googleusercontent.com",
+          "client_id": "1041888734011-tivpcn8efo5723ks6q6vs1rh8e87teh2.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.Js.DoctorConnect",
@@ -36,7 +36,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "1041888734011-qdvds4r3h9rt9i7i2qepalbfqv2i2smb.apps.googleusercontent.com",
+              "client_id": "1041888734011-tivpcn8efo5723ks6q6vs1rh8e87teh2.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

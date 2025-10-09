@@ -24,10 +24,10 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('doctorapp-release-key.keystore')
-            storePassword 'android'
-            keyAlias 'doctorapp-release'
-            keyPassword 'android'
+            storeFile file('my-release-key.jks')
+            storePassword 'your_keystore_password'
+            keyAlias 'my-key-alias'
+            keyPassword 'your_key_password'
         }
     }
     buildTypes {

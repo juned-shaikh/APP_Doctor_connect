@@ -988,6 +988,13 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
           }
         },
         {
+          text: 'Notification Test',
+          icon: 'notifications-outline',
+          handler: () => {
+            this.router.navigate(['/patient/simple-notification-test']);
+          }
+        },
+        {
           text: 'Logout',
           icon: 'log-out-outline',
           role: 'destructive',
@@ -1041,4 +1048,5 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
       this.selectedDoctorProfile.avatar = undefined;
     }
   }
+
 }

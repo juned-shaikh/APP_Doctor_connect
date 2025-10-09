@@ -4,6 +4,7 @@ import { NotificationService } from './notification.service';
 import { AuthService } from './auth.service';
 import { Observable } from 'rxjs';
 import { AlertController, ToastController } from '@ionic/angular/standalone';
+import { LocalNotificationService } from './local-notification.service';
 
 export interface RescheduleData {
   appointmentId: string;
@@ -28,7 +29,8 @@ export class AppointmentService {
     private notificationService: NotificationService,
     private authService: AuthService,
     private alertController: AlertController,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private localNotificationService: LocalNotificationService
   ) {}
 
   async bookAppointment(appointmentData: Partial<AppointmentData>): Promise<string> {
@@ -216,12 +218,20 @@ export class AppointmentService {
 
   async approveAppointment(appointmentId: string): Promise<void> {
     try {
+      console.log('[AppointmentService] 📝 Doctor approving appointment:', appointmentId);
+      
       await this.firebaseService.updateAppointment(appointmentId, {
         status: 'confirmed'
       });
 
+      console.log('[AppointmentService] ✅ Appointment status updated to confirmed in database');
+
       const appointment = await this.getAppointmentById(appointmentId);
+      console.log('[AppointmentService] 🔍 Retrieved appointment data:', appointment);
+      
       if (appointment) {
+        console.log('[AppointmentService] 📧 Creating database notification for patient:', appointment.patientId);
+        
         await this.firebaseService.createNotification({
           userId: appointment.patientId,
           title: 'Appointment Confirmed',
@@ -230,15 +240,33 @@ export class AppointmentService {
           isRead: false,
           data: { appointmentId }
         });
+        
+        console.log('[AppointmentService] 📱 Triggering local notification for appointment confirmation');
+        console.log('[AppointmentService] 📋 Appointment data for notification:', {
+          id: appointment.id,
+          doctorName: appointment.doctorName,
+          date: appointment.date,
+          time: appointment.time,
+          appointmentType: appointment.appointmentType
+        });
+        
+        // Send local notification
+        console.log('[AppointmentService] 🔔 Calling localNotificationService.sendAppointmentConfirmedNotification()');
+        await this.localNotificationService.sendAppointmentConfirmedNotification(appointment);
+        console.log('[AppointmentService] ✅ Local notification triggered successfully');
+      } else {
+        console.log('[AppointmentService] ⚠️ No appointment data found for ID:', appointmentId);
       }
 
       await this.notificationService.showToastNotification(
         'Appointment approved successfully',
         'success'
       );
+      
+      console.log('[AppointmentService] ✅ Appointment approval completed successfully');
 
     } catch (error) {
-      console.error('Error approving appointment:', error);
+      console.error('[AppointmentService] ❌ Error approving appointment:', error);
       throw error;
     }
   }

@@ -47,8 +47,8 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/video-demo/video-demo.page').then(m => m.VideoDemoPage)
   },
   {
-    path: 'debug-google',
-    loadComponent: () => import('./debug-google-signin.component').then(m => m.DebugGoogleSigninComponent)
-  },
+    path: 'simple-notification-test',
+    loadComponent: () => import('./components/simple-notification-test.component').then(m => m.SimpleNotificationTestComponent)
+  }
 
 ];

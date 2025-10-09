@@ -3,6 +3,7 @@ import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import { PushNotificationService } from './services/push-notification.service';
+import { LocalNotificationService } from './services/local-notification.service';
 
 @Component({
   selector: 'app-root',
@@ -11,7 +12,8 @@ import { PushNotificationService } from './services/push-notification.service';
 })
 export class AppComponent implements OnInit {
   constructor(
-    private pushNotificationService: PushNotificationService
+    private pushNotificationService: PushNotificationService,
+    private localNotificationService: LocalNotificationService
   ) {
     this.configureStatusBar();
   }

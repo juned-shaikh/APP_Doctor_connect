@@ -12,7 +12,7 @@ import {
   callOutline, videocamOutline, cashOutline, cardOutline,
   ellipsisVerticalOutline, checkmarkCircleOutline, closeCircleOutline,
   timeOutline as timeCircleOutline, refreshOutline, searchOutline,
-  eyeOutline, closeOutline, helpCircleOutline
+  eyeOutline, closeOutline, helpCircleOutline, notificationsOutline
 } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -20,6 +20,7 @@ import { AuthService } from '../../../services/auth.service';
 import { FirebaseService } from '../../../services/firebase.service';
 import { AppointmentService } from '../../../services/appointment.service';
 import { NotificationService } from '../../../services/notification.service';
+import { LocalNotificationService } from '../../../services/local-notification.service';
 
 @Component({
   selector: 'app-patient-appointments',
@@ -30,6 +31,11 @@ import { NotificationService } from '../../../services/notification.service';
           <ion-back-button defaultHref="/patient/dashboard"></ion-back-button>
         </ion-buttons>
         <ion-title>My Appointments</ion-title>
+        <ion-buttons slot="end">
+          <ion-button fill="clear" (click)="testNotification()">
+            <ion-icon name="notifications-outline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -389,12 +395,14 @@ export class PatientAppointmentsPage implements OnInit {
   filteredAppointments: any[] = [];
   selectedFilter = 'all';
   isLoading = true;
+  private previousAppointmentStatuses: Map<string, string> = new Map(); // Track appointment statuses
 
   constructor(
     private authService: AuthService,
     private firebaseService: FirebaseService,
     private appointmentService: AppointmentService,
     private notificationService: NotificationService,
+    private localNotificationService: LocalNotificationService,
     private router: Router,
     private actionSheetController: ActionSheetController,
     private alertController: AlertController,
@@ -405,13 +413,14 @@ export class PatientAppointmentsPage implements OnInit {
       callOutline, videocamOutline, cashOutline, cardOutline,
       ellipsisVerticalOutline, checkmarkCircleOutline, closeCircleOutline,
       timeCircleOutline, refreshOutline, searchOutline, eyeOutline,
-      closeOutline, helpCircleOutline
+      closeOutline, helpCircleOutline, notificationsOutline
     });
   }
 
   ngOnInit() {
     this.overrideBackButton();
     this.loadAppointments();
+    this.listenForAppointmentStatusChanges();
   }
 
   // Override the default back button behavior to ensure navigation to dashboard
@@ -472,6 +481,67 @@ export class PatientAppointmentsPage implements OnInit {
       this.showToast('Failed to load appointments', 'danger');
       this.isLoading = false;
     }
+  }
+
+  private listenForAppointmentStatusChanges() {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) return;
+
+    console.log('[AppointmentsPage] 👂 Setting up appointment status change listener for user:', currentUser.uid);
+
+    // Listen for real-time appointment changes
+    this.firebaseService.getAppointmentsByPatient(currentUser.uid).subscribe({
+      next: (appointments) => {
+        console.log('[AppointmentsPage] 📋 Appointments updated, count:', appointments.length);
+        
+        // Check for status changes BEFORE updating the appointments array
+        appointments.forEach(appointment => {
+          if (!appointment.id) return;
+          
+          const previousStatus = this.previousAppointmentStatuses.get(appointment.id);
+          const currentStatus = appointment.status;
+          
+          console.log('[AppointmentsPage] 🔍 Checking appointment:', appointment.id, {
+            previousStatus: previousStatus,
+            currentStatus: currentStatus
+          });
+          
+          // Only trigger notification if we have a previous status (not first load)
+          // and status changed from pending to confirmed
+          if (previousStatus && previousStatus === 'pending' && currentStatus === 'confirmed') {
+            console.log('[AppointmentsPage] 🎉 Appointment status changed from pending to confirmed:', appointment.id);
+            console.log('[AppointmentsPage] 📋 Appointment details:', {
+              doctorName: appointment.doctorName,
+              date: appointment.date,
+              time: appointment.time,
+              appointmentType: appointment.appointmentType
+            });
+            
+            // Trigger local notification
+            this.localNotificationService.sendAppointmentConfirmedNotification(appointment)
+              .then(() => {
+                console.log('[AppointmentsPage] ✅ Notification sent successfully');
+              })
+              .catch((error) => {
+                console.error('[AppointmentsPage] ❌ Error sending notification:', error);
+              });
+            
+            // Show toast as well for immediate feedback
+            this.showToast(`Your appointment with Dr. ${appointment.doctorName} has been confirmed!`, 'success');
+          }
+          
+          // Update the status tracking map
+          this.previousAppointmentStatuses.set(appointment.id, currentStatus);
+        });
+        
+        // Update appointments list
+        this.appointments = appointments;
+        this.filterAppointments();
+      },
+      error: (error) => {
+        console.error('[AppointmentsPage] ❌ Error listening for appointment changes:', error);
+      }
+    });
   }
 
   onFilterChange(event: any) {
@@ -674,5 +744,16 @@ export class PatientAppointmentsPage implements OnInit {
       position: 'bottom'
     });
     await toast.present();
+  }
+
+  // Test notification method
+  async testNotification() {
+    try {
+      await this.localNotificationService.testNotification();
+      await this.showToast('Test notification sent!', 'success');
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      await this.showToast('Failed to send test notification', 'danger');
+    }
   }
 }
