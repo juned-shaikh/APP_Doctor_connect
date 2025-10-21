@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
-import { 
-  IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardHeader, 
+import {
+  IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonButton, IonIcon, IonText, IonGrid,
   IonRow, IonCol, IonSearchbar, IonChip, IonLabel, IonAvatar, IonButtons,
   IonModal, IonSpinner,
@@ -10,8 +10,8 @@ import {
 import { AuthService, User } from '../../../services/auth.service';
 import { FirebaseService, UserData } from '../../../services/firebase.service';
 import { addIcons } from 'ionicons';
-import { 
-  searchOutline, heartOutline, calendarOutline, peopleOutline, 
+import {
+  searchOutline, heartOutline, calendarOutline, peopleOutline,
   medicalOutline, eyeOutline, personOutline, bodyOutline,
   womanOutline, pulseOutline, happyOutline, locationOutline, starOutline,
   ellipsisVerticalOutline, logOutOutline, settingsOutline, briefcaseOutline,
@@ -63,8 +63,11 @@ interface DashboardDoctor {
         <!-- Search Section -->
         <div class="search-section">
           <ion-searchbar 
-            placeholder="Search doctors, specializations..."
+            placeholder="Search doctors, specializations, locations..."
             (ionInput)="onSearch($event)"
+            (ionClear)="onSearchClear()"
+            [value]="searchQuery"
+            showClearButton="focus"
             class="custom-searchbar">
           </ion-searchbar>
         </div>
@@ -116,6 +119,13 @@ interface DashboardDoctor {
             </ion-chip>
           </div>
         </div>-->
+
+        <!-- Search Results Info -->
+        <div class="search-results-info" *ngIf="searchQuery && searchQuery.trim() !== ''">
+          <ion-text color="medium">
+            <p>{{ visibleDoctors.length }} doctor{{ visibleDoctors.length !== 1 ? 's' : '' }} found for "{{ searchQuery }}"</p>
+          </ion-text>
+        </div>
 
         <!-- Doctors List (live, filtered, featured on top) -->
         <div class="featured-doctors">
@@ -406,6 +416,15 @@ interface DashboardDoctor {
       --border-radius: 12px;
       --box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+    .search-results-info {
+      margin: -1rem 0 1rem 0;
+      text-align: center;
+    }
+    .search-results-info p {
+      margin: 0;
+      font-size: 0.9rem;
+      font-style: italic;
+    }
     .quick-actions {
       margin-bottom: 2rem;
     }
@@ -680,7 +699,7 @@ interface DashboardDoctor {
   `],
   imports: [
     CommonModule,
-    IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardHeader, 
+    IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardHeader,
     IonCardTitle, IonCardContent, IonButton, IonIcon, IonText, IonGrid,
     IonRow, IonCol, IonSearchbar, IonChip, IonLabel, IonAvatar, IonButtons,
     IonModal, IonSpinner
@@ -689,7 +708,7 @@ interface DashboardDoctor {
 })
 export class PatientDashboardPage implements OnInit, OnDestroy {
   currentUser: User | null = null;
-  
+
   specializations = [
     { name: 'General Medicine', value: 'general-medicine', icon: 'medical-outline' },
     { name: 'Cardiology', value: 'cardiology', icon: 'heart-outline' },
@@ -714,6 +733,7 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
 
   // UI filter state
   selectedSpecialization: string = 'all';
+  searchQuery: string = '';
 
   recentAppointments = [
     {
@@ -739,7 +759,7 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
     private alertController: AlertController,
     private firebaseService: FirebaseService
   ) {
-    addIcons({ 
+    addIcons({
       searchOutline, calendarOutline, peopleOutline, personOutline,
       medicalOutline, heartOutline, eyeOutline, bodyOutline, pulseOutline,
       womanOutline, happyOutline, locationOutline, starOutline,
@@ -796,10 +816,25 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
   }
 
   private applyFilters() {
-    const spec = this.selectedSpecialization;
-    const filtered = spec === 'all' 
-      ? this.allDoctors
-      : this.allDoctors.filter(d => (d.specialization || '').toLowerCase() === spec.toLowerCase());
+    let filtered = this.allDoctors;
+
+    // Apply specialization filter
+    if (this.selectedSpecialization !== 'all') {
+      filtered = filtered.filter(d =>
+        (d.specialization || '').toLowerCase() === this.selectedSpecialization.toLowerCase()
+      );
+    }
+
+    // Apply search query filter
+    if (this.searchQuery && this.searchQuery.trim() !== '') {
+      const query = this.searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(d =>
+        (d.name || '').toLowerCase().includes(query) ||
+        (d.specialization || '').toLowerCase().includes(query) ||
+        (d.location || '').toLowerCase().includes(query)
+      );
+    }
+
     this.visibleDoctors = this.sortDoctors(filtered);
   }
 
@@ -858,12 +893,13 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
   }
 
   onSearch(event: any) {
-    const query = event.target.value;
-    if (query && query.trim() !== '') {
-      this.router.navigate(['/patient/search-doctors'], { 
-        queryParams: { q: query } 
-      });
-    }
+    this.searchQuery = event.target.value || '';
+    this.applyFilters();
+  }
+
+  onSearchClear() {
+    this.searchQuery = '';
+    this.applyFilters();
   }
 
   searchDoctors() {
@@ -883,8 +919,8 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
   }
 
   searchBySpecialization(specialization: string) {
-    this.router.navigate(['/patient/search-doctors'], { 
-      queryParams: { specialization } 
+    this.router.navigate(['/patient/search-doctors'], {
+      queryParams: { specialization }
     });
   }
 
