@@ -1,0 +1,245 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Revenue Management</ion-title>
+    <ion-buttons slot="end">
+      <ion-button fill="clear" (click)="testFirebaseData()">
+        <ion-icon name="bug-outline"></ion-icon>
+      </ion-button>
+      <ion-button fill="clear" (click)="refreshData()">
+        <ion-icon name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="revenue-container">
+    <!-- Period Filter -->
+    <div class="period-filter">
+      <ion-segment 
+        [(ngModel)]="selectedPeriod" 
+        (ionChange)="onPeriodChange($event)"
+        class="period-segment">
+        <ion-segment-button value="week">
+          <ion-label>This Week</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="month">
+          <ion-label>This Month</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="year">
+          <ion-label>This Year</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="loading-container">
+      <ion-spinner name="circular"></ion-spinner>
+      <p>Loading revenue data...</p>
+    </div>
+
+    <div *ngIf="!isLoading">
+      <!-- Revenue Summary -->
+      <div class="summary-section">
+        <h2>Revenue Summary</h2>
+        <ion-grid>
+          <ion-row>
+            <ion-col size="12" size-md="3">
+              <ion-card class="summary-card">
+                <ion-card-content>
+                  <div class="summary-header">
+                    <ion-icon name="cash-outline" color="success"></ion-icon>
+                    <div class="growth-indicator">
+                      <ion-icon name="trending-up-outline" color="success"></ion-icon>
+                      <span class="growth-text">+{{ revenueGrowth }}%</span>
+                    </div>
+                  </div>
+                  <h3>₹{{ totalRevenue | number:'1.0-0' }}</h3>
+                  <p>Total Revenue</p>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+            
+            <ion-col size="12" size-md="3">
+              <ion-card class="summary-card">
+                <ion-card-content>
+                  <div class="summary-header">
+                    <ion-icon name="card-outline" color="primary"></ion-icon>
+                  </div>
+                  <h3>₹{{ platformCommission | number:'1.0-0' }}</h3>
+                  <p>Platform Commission</p>
+                  <small>{{ commissionRate }}% of total</small>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+            
+            <ion-col size="12" size-md="3">
+              <ion-card class="summary-card">
+                <ion-card-content>
+                  <div class="summary-header">
+                    <ion-icon name="medical-outline" color="tertiary"></ion-icon>
+                  </div>
+                  <h3>₹{{ doctorEarnings | number:'1.0-0' }}</h3>
+                  <p>Doctor Earnings</p>
+                  <small>{{ 100 - commissionRate }}% of total</small>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+            
+            <ion-col size="12" size-md="3">
+              <ion-card class="summary-card">
+                <ion-card-content>
+                  <div class="summary-header">
+                    <ion-icon name="checkmark-circle-outline" color="warning"></ion-icon>
+                  </div>
+                  <h3>{{ paidAppointments }}</h3>
+                  <p>Paid Appointments</p>
+                  <small>{{ totalAppointments }} total</small>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+      </div>
+
+      <!-- Doctor Revenue List -->
+      <div class="doctor-revenue-section">
+        <div class="section-header">
+          <h2>Doctor Revenue Breakdown</h2>
+          <div class="filter-controls">
+            <ion-searchbar 
+              [(ngModel)]="searchTerm"
+              (ionInput)="onSearchChange($event)"
+              placeholder="Search doctors..."
+              show-clear-button="focus">
+            </ion-searchbar>
+            <ion-select 
+              [(ngModel)]="sortBy" 
+              (ionChange)="onSortChange($event)"
+              placeholder="Sort by"
+              interface="popover">
+              <ion-select-option value="revenue">Revenue (High to Low)</ion-select-option>
+              <ion-select-option value="appointments">Appointments</ion-select-option>
+              <ion-select-option value="name">Name (A-Z)</ion-select-option>
+              <ion-select-option value="commission">Commission</ion-select-option>
+            </ion-select>
+          </div>
+        </div>
+
+        <div class="doctor-revenue-list">
+          <ion-card *ngFor="let doctor of filteredDoctors" class="doctor-revenue-card">
+            <ion-card-content>
+              <div class="doctor-header">
+                <div class="doctor-info">
+                  <div class="doctor-avatar">
+                    <img [src]="doctor.profileImage || 'assets/images/default-doctor.png'" [alt]="doctor.name">
+                  </div>
+                  <div class="doctor-details">
+                    <h3>{{ doctor.name }}</h3>
+                    <p class="specialization">{{ doctor.specialization }}</p>
+                    <div class="doctor-badges">
+                      <ion-badge [color]="doctor.isVerified ? 'success' : 'warning'">
+                        {{ doctor.isVerified ? 'Verified' : 'Pending' }}
+                      </ion-badge>
+                      <ion-badge [color]="doctor.isActive ? 'primary' : 'medium'">
+                        {{ doctor.isActive ? 'Active' : 'Inactive' }}
+                      </ion-badge>
+                    </div>
+                  </div>
+                </div>
+                <div class="revenue-summary">
+                  <div class="revenue-amount">
+                    <h3>₹{{ doctor.totalRevenue | number:'1.0-0' }}</h3>
+                    <p>Total Revenue</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="revenue-breakdown">
+                <ion-grid>
+                  <ion-row>
+                    <ion-col size="6" size-md="3">
+                      <div class="metric-item">
+                        <ion-icon name="calendar-outline" color="primary"></ion-icon>
+                        <div class="metric-content">
+                          <h4>{{ doctor.totalAppointments }}</h4>
+                          <p>Appointments</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                    
+                    <ion-col size="6" size-md="3">
+                      <div class="metric-item">
+                        <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
+                        <div class="metric-content">
+                          <h4>{{ doctor.paidAppointments }}</h4>
+                          <p>Paid</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                    
+                    <ion-col size="6" size-md="3">
+                      <div class="metric-item">
+                        <ion-icon name="cash-outline" color="tertiary"></ion-icon>
+                        <div class="metric-content">
+                          <h4>₹{{ doctor.doctorEarnings | number:'1.0-0' }}</h4>
+                          <p>Doctor Share</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                    
+                    <ion-col size="6" size-md="3">
+                      <div class="metric-item">
+                        <ion-icon name="card-outline" color="warning"></ion-icon>
+                        <div class="metric-content">
+                          <h4>₹{{ doctor.platformCommission | number:'1.0-0' }}</h4>
+                          <p>Commission</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                  </ion-row>
+                </ion-grid>
+              </div>
+
+              <div class="revenue-details">
+                <div class="detail-row">
+                  <span class="label">Average per appointment:</span>
+                  <span class="value">₹{{ doctor.avgRevenuePerAppointment | number:'1.0-0' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="label">Commission rate:</span>
+                  <span class="value">{{ commissionRate }}%</span>
+                </div>
+                <div class="detail-row">
+                  <span class="label">Payment success rate:</span>
+                  <span class="value">{{ doctor.paymentSuccessRate }}%</span>
+                </div>
+              </div>
+
+              <div class="action-buttons">
+                <ion-button fill="outline" size="small" (click)="viewDoctorDetails(doctor)">
+                  <ion-icon name="eye-outline" slot="start"></ion-icon>
+                  View Details
+                </ion-button>
+                <ion-button fill="outline" size="small" (click)="downloadReport(doctor)">
+                  <ion-icon name="download-outline" slot="start"></ion-icon>
+                  Download Report
+                </ion-button>
+              </div>
+            </ion-card-content>
+          </ion-card>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="filteredDoctors.length === 0" class="empty-state">
+          <ion-icon name="cash-outline"></ion-icon>
+          <h3>No revenue data found</h3>
+          <p>Try adjusting your search or filter criteria</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</ion-content>

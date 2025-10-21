@@ -4,6 +4,11 @@
       <ion-back-button defaultHref="/admin/dashboard"></ion-back-button>
     </ion-buttons>
     <ion-title>Analytics & Reports</ion-title>
+    <ion-buttons slot="end">
+      <ion-button fill="clear" (click)="debugLoadData()">
+        <ion-icon name="bug-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -27,10 +32,22 @@
       </ion-segment>
     </div>
 
+    <!-- Period Info -->
+    <div *ngIf="!isLoading" class="period-info">
+      <ion-card>
+        <ion-card-content>
+          <div style="text-align: center;">
+            <h3>{{ getPeriodTitle() }}</h3>
+            <p style="color: var(--ion-color-medium); margin: 0;">{{ getPeriodDateRange() }}</p>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
     <!-- Loading State -->
     <div *ngIf="isLoading" class="loading-container">
       <ion-spinner name="circular"></ion-spinner>
-      <p>Loading analytics...</p>
+      <p>Loading analytics for {{ getPeriodTitle().toLowerCase() }}...</p>
     </div>
 
     <div *ngIf="!isLoading">
@@ -134,6 +151,197 @@
             </ion-col>
           </ion-row>
         </ion-grid>
+      </div>
+
+      <!-- Doctor-wise Analytics -->
+      <div class="doctor-analytics-section">
+        <div class="section-header">
+          <h2>Doctor Performance</h2>
+          <ion-segment 
+            [(ngModel)]="selectedDoctorView" 
+            (ionChange)="onDoctorViewChange($event)"
+            class="doctor-view-segment">
+            <ion-segment-button value="top">
+              <ion-label>Top Performers</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="all">
+              <ion-label>All Doctors</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </div>
+
+        <div class="doctor-metrics-grid">
+          <ion-grid>
+            <ion-row>
+              <ion-col size="12" size-md="4">
+                <ion-card class="doctor-summary-card">
+                  <ion-card-content>
+                    <div class="summary-header">
+                      <ion-icon name="medical-outline" color="success"></ion-icon>
+                      <h3>{{ doctorAnalytics.totalActiveDoctors }}</h3>
+                    </div>
+                    <p>Active Doctors</p>
+                    <div class="sub-stats">
+                      <span>{{ doctorAnalytics.verifiedDoctors }} verified</span>
+                      <span>{{ doctorAnalytics.pendingVerification }} pending</span>
+                    </div>
+                  </ion-card-content>
+                </ion-card>
+              </ion-col>
+              
+              <ion-col size="12" size-md="4">
+                <ion-card class="doctor-summary-card">
+                  <ion-card-content>
+                    <div class="summary-header">
+                      <ion-icon name="star-outline" color="warning"></ion-icon>
+                      <h3>{{ doctorAnalytics.averageRating | number:'1.1-1' }}</h3>
+                    </div>
+                    <p>Average Rating</p>
+                    <div class="sub-stats">
+                      <span>{{ doctorAnalytics.totalReviews }} total reviews</span>
+                    </div>
+                  </ion-card-content>
+                </ion-card>
+              </ion-col>
+              
+              <ion-col size="12" size-md="4">
+                <ion-card class="doctor-summary-card">
+                  <ion-card-content>
+                    <div class="summary-header">
+                      <ion-icon name="time-outline" color="primary"></ion-icon>
+                      <h3>{{ doctorAnalytics.averageResponseTime }}h</h3>
+                    </div>
+                    <p>Avg Response Time</p>
+                    <div class="sub-stats">
+                      <span>{{ doctorAnalytics.onTimeDoctors }}% on-time</span>
+                    </div>
+                  </ion-card-content>
+                </ion-card>
+              </ion-col>
+            </ion-row>
+          </ion-grid>
+        </div>
+
+        <!-- Debug Section -->
+        <div *ngIf="displayedDoctors.length === 0" class="no-doctors">
+          <ion-card>
+            <ion-card-content style="text-align: center; padding: 2rem;">
+              <ion-icon name="medical-outline" size="large" color="medium"></ion-icon>
+              <h3>No Doctors Found</h3>
+              <p>There are no doctors in the database or they are not active.</p>
+              <ion-button fill="outline" (click)="checkDoctorsInDatabase()">
+                <ion-icon name="search-outline" slot="start"></ion-icon>
+                Check Database
+              </ion-button>
+            </ion-card-content>
+          </ion-card>
+        </div>
+
+        <div class="doctor-list">
+          <ion-card *ngFor="let doctor of displayedDoctors" class="doctor-card">
+            <ion-card-content>
+              <div class="doctor-header">
+                <div class="doctor-info">
+                  <div class="doctor-avatar">
+                    <img [src]="doctor.profileImage || 'assets/images/default-doctor.png'" [alt]="doctor.name">
+                  </div>
+                  <div class="doctor-details">
+                    <h3>{{ doctor.name }}</h3>
+                    <p class="specialization">{{ doctor.specialization }}</p>
+                    <div class="doctor-badges">
+                      <ion-badge [color]="doctor.isVerified ? 'success' : 'warning'">
+                        {{ doctor.isVerified ? 'Verified' : 'Pending' }}
+                      </ion-badge>
+                      <ion-badge [color]="doctor.isActive ? 'primary' : 'medium'">
+                        {{ doctor.isActive ? 'Active' : 'Inactive' }}
+                      </ion-badge>
+                    </div>
+                  </div>
+                </div>
+                <div class="doctor-rating">
+                  <div class="rating-display">
+                    <ion-icon name="star" color="warning"></ion-icon>
+                    <span>{{ doctor.rating | number:'1.1-1' }}</span>
+                  </div>
+                  <p>{{ doctor.totalReviews }} reviews</p>
+                </div>
+              </div>
+
+              <div class="doctor-stats">
+                <ion-grid>
+                  <ion-row>
+                    <ion-col size="6" size-md="3">
+                      <div class="stat-item">
+                        <ion-icon name="calendar-outline" color="primary"></ion-icon>
+                        <div class="stat-content">
+                          <h4>{{ doctor.totalAppointments }}</h4>
+                          <p>Total Appointments</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                    
+                    <ion-col size="6" size-md="3">
+                      <div class="stat-item">
+                        <ion-icon name="checkmark-circle-outline" color="success"></ion-icon>
+                        <div class="stat-content">
+                          <h4>{{ doctor.completedAppointments }}</h4>
+                          <p>Completed</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                    
+                    <ion-col size="6" size-md="3">
+                      <div class="stat-item">
+                        <ion-icon name="cash-outline" color="tertiary"></ion-icon>
+                        <div class="stat-content">
+                          <h4>₹{{ doctor.totalEarnings | number:'1.0-0' }}</h4>
+                          <p>Total Earnings</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                    
+                    <ion-col size="6" size-md="3">
+                      <div class="stat-item">
+                        <ion-icon name="people-outline" color="secondary"></ion-icon>
+                        <div class="stat-content">
+                          <h4>{{ doctor.uniquePatients }}</h4>
+                          <p>Unique Patients</p>
+                        </div>
+                      </div>
+                    </ion-col>
+                  </ion-row>
+                </ion-grid>
+              </div>
+
+              <div class="doctor-performance">
+                <div class="performance-metrics">
+                  <div class="metric">
+                    <span class="metric-label">Completion Rate</span>
+                    <div class="metric-bar">
+                      <div class="metric-fill" [style.width.%]="doctor.completionRate"></div>
+                    </div>
+                    <span class="metric-value">{{ doctor.completionRate }}%</span>
+                  </div>
+                  
+                  <div class="metric">
+                    <span class="metric-label">Response Time</span>
+                    <div class="metric-bar">
+                      <div class="metric-fill" [style.width.%]="getResponseTimePercentage(doctor.avgResponseTime)"></div>
+                    </div>
+                    <span class="metric-value">{{ doctor.avgResponseTime }}h</span>
+                  </div>
+                </div>
+              </div>
+            </ion-card-content>
+          </ion-card>
+        </div>
+
+        <div *ngIf="selectedDoctorView === 'all' && doctorsList.length > displayedDoctors.length" class="load-more">
+          <ion-button fill="outline" (click)="loadMoreDoctors()">
+            <ion-icon name="chevron-down-outline" slot="start"></ion-icon>
+            Load More Doctors
+          </ion-button>
+        </div>
       </div>
 
       <!-- Top Specializations -->

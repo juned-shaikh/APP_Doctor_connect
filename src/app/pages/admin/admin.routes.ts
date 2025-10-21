@@ -25,5 +25,9 @@ export const routes: Routes = [
   {
     path: 'system-settings',
     loadComponent: () => import('./system-settings/system-settings.page').then(m => m.SystemSettingsPage)
+  },
+  {
+    path: 'revenue',
+    loadComponent: () => import('./revenue/revenue.page').then(m => m.RevenuePage)
   }
 ];

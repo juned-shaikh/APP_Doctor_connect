@@ -36,6 +36,10 @@ export const routes: Routes = [
         loadComponent: () => import('./book-appointment/book-appointment.page').then(m => m.BookAppointmentPage)
       },
       {
+        path: 'reschedule-appointment/:appointmentId',
+        loadComponent: () => import('./reschedule-appointment/reschedule-appointment.page').then(m => m.RescheduleAppointmentPage)
+      },
+      {
         path: 'prescriptions',
         loadComponent: () => import('./prescriptions/prescriptions.page').then(m => m.PatientPrescriptionsPage)
       },

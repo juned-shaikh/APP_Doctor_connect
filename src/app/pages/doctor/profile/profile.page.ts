@@ -6,7 +6,7 @@ import {
   IonAvatar, IonImg, IonGrid, IonRow, IonCol
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { personOutline, settingsOutline, cameraOutline, saveOutline } from 'ionicons/icons';
+import { personOutline, settingsOutline, cameraOutline, saveOutline, logOutOutline } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { FirebaseService, UserData } from '../../../services/firebase.service';
@@ -25,6 +25,9 @@ import { Router } from '@angular/router';
         <ion-buttons slot="end">
           <ion-button [disabled]="saving || form.invalid" (click)="save()">
             <ion-icon name="save-outline"></ion-icon>
+          </ion-button>
+          <ion-button fill="clear" (click)="logout()">
+            <ion-icon name="log-out-outline"></ion-icon>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -204,7 +207,7 @@ export class DoctorProfilePage implements OnInit, OnDestroy {
     private auth: AuthService,
     public router: Router
   ) {
-    addIcons({ personOutline, settingsOutline, cameraOutline, saveOutline });
+    addIcons({ personOutline, settingsOutline, cameraOutline, saveOutline, logOutOutline });
   }
 
   ngOnInit() {
@@ -356,6 +359,16 @@ export class DoctorProfilePage implements OnInit, OnDestroy {
       alert('Failed to save profile. Please try again.');
     } finally {
       this.saving = false;
+    }
+  }
+
+  async logout() {
+    try {
+      await this.auth.signOut();
+      this.router.navigate(['/auth']);
+    } catch (error) {
+      console.error('Error logging out:', error);
+      alert('Failed to logout. Please try again.');
     }
   }
 }

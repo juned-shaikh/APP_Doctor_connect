@@ -375,7 +375,7 @@ export class AdminDashboardPage implements OnInit {
 
   viewAnalytics() {
     // Navigate to analytics page
-    console.log('Navigate to analytics');
+    this.router.navigate(['/admin/analytics']);
   }
 
   systemSettings() {
@@ -390,7 +390,7 @@ export class AdminDashboardPage implements OnInit {
 
   manageRevenue() {
     // Navigate to revenue management
-    console.log('Navigate to revenue management');
+    this.router.navigate(['/admin/revenue']);
   }
 
   async showUserMenu() {

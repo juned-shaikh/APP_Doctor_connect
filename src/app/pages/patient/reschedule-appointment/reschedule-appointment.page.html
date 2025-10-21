@@ -1,0 +1,147 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button (click)="goBack()"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Reschedule Appointment</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="reschedule-container">
+    <!-- Current Appointment Info -->
+    <ion-card *ngIf="appointment" class="current-appointment-card">
+      <ion-card-header>
+        <ion-card-title>Current Appointment</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="appointment-info">
+          <div class="info-item">
+            <ion-icon name="person-outline" color="primary"></ion-icon>
+            <span>Dr. {{ appointment.doctorName }}</span>
+          </div>
+          <div class="info-item">
+            <ion-icon name="calendar-outline" color="primary"></ion-icon>
+            <span>{{ getFormattedDate(appointment.date) }}</span>
+          </div>
+          <div class="info-item">
+            <ion-icon name="time-outline" color="primary"></ion-icon>
+            <span>{{ appointment.time }}</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoadingSchedule" class="loading-container">
+      <ion-spinner></ion-spinner>
+      <p>Loading available slots...</p>
+    </div>
+
+    <!-- Date Selection -->
+    <ion-card *ngIf="!isLoadingSchedule">
+      <ion-card-header>
+        <ion-card-title>Select New Date</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="date-grid">
+          <div 
+            *ngFor="let date of availableDates" 
+            class="date-option"
+            [class.selected]="selectedDate === date.value"
+            (click)="selectDate(date.value)">
+            <div class="day">{{ date.day }}</div>
+            <div class="date">{{ date.date }}</div>
+          </div>
+        </div>
+        
+        <div *ngIf="availableDates.length === 0" class="no-dates">
+          <ion-text color="medium">
+            <p>No available dates found. Please try again later or contact the doctor directly.</p>
+          </ion-text>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Time Selection -->
+    <ion-card *ngIf="selectedDate && timeSlots.length > 0">
+      <ion-card-header>
+        <ion-card-title>Select New Time</ion-card-title>
+        <ion-note>{{ getFormattedDate(selectedDate) }}</ion-note>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="time-grid">
+          <div 
+            *ngFor="let slot of timeSlots" 
+            class="time-slot"
+            [class.selected]="selectedTime?.time === slot.time"
+            [class.booked]="slot.booked"
+            (click)="selectTime(slot)">
+            {{ slot.time }}
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- No Time Slots Available -->
+    <ion-card *ngIf="selectedDate && timeSlots.length === 0">
+      <ion-card-content>
+        <div class="no-slots">
+          <ion-text color="medium">
+            <p>No available time slots for this date. Please select another date.</p>
+          </ion-text>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Reason Form -->
+    <ion-card *ngIf="selectedDate && selectedTime">
+      <ion-card-header>
+        <ion-card-title>Reason for Rescheduling</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <form [formGroup]="rescheduleForm">
+          <ion-item>
+            <ion-textarea 
+              formControlName="reason"
+              placeholder="Please provide a reason for rescheduling (optional)"
+              rows="3"
+              maxlength="500">
+            </ion-textarea>
+          </ion-item>
+        </form>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Reschedule Button -->
+    <div class="reschedule-actions" *ngIf="selectedDate && selectedTime">
+      <ion-button 
+        expand="block" 
+        [disabled]="!canReschedule() || isLoading"
+        (click)="rescheduleAppointment()">
+        <ion-spinner *ngIf="isLoading" slot="start"></ion-spinner>
+        {{ isLoading ? 'Rescheduling...' : 'Reschedule Appointment' }}
+      </ion-button>
+      
+      <ion-note class="reschedule-note">
+        <ion-icon name="document-text-outline"></ion-icon>
+        Your rescheduled appointment will need doctor approval. You'll be notified once confirmed.
+      </ion-note>
+    </div>
+
+    <!-- Policy Note -->
+    <ion-card class="policy-card">
+      <ion-card-content>
+        <ion-text color="medium">
+          <h4>Rescheduling Policy</h4>
+          <ul>
+            <li>Appointments can only be rescheduled at least 24 hours in advance</li>
+            <li>Rescheduled appointments require doctor approval</li>
+            <li>You'll receive a notification once your request is processed</li>
+            <li>Multiple reschedules may incur additional charges</li>
+          </ul>
+        </ion-text>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

@@ -345,26 +345,7 @@ interface DashboardDoctor {
           </ng-template>
         </ion-modal>
 
-        <!-- Recent Activity -->
-        <div class="recent-activity" *ngIf="recentAppointments.length > 0">
-          <ion-text color="dark">
-            <h3>Recent Appointments</h3>
-          </ion-text>
-          <ion-card *ngFor="let appointment of recentAppointments" class="appointment-card">
-            <ion-card-content>
-              <div class="appointment-info">
-                <div class="appointment-details">
-                  <h4>{{ appointment.doctorName }}</h4>
-                  <p>{{ appointment.specialization }}</p>
-                  <p class="date">{{ appointment.date | date:'medium' }}</p>
-                </div>
-                <ion-chip [color]="getStatusColor(appointment.status)">
-                  {{ appointment.status }}
-                </ion-chip>
-              </div>
-            </ion-card-content>
-          </ion-card>
-        </div>
+        
       </div>
     </ion-content>
   `,

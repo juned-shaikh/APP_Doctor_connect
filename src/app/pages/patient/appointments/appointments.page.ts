@@ -106,6 +106,10 @@ import { LocalNotificationService } from '../../../services/local-notification.s
 
               <div class="appointment-details">
                 <div class="detail-item">
+                  <ion-icon name="person-outline" color="primary"></ion-icon>
+                  <span>Patient: {{ appointment.patientName || 'Not specified' }}</span>
+                </div>
+                <div class="detail-item">
                   <ion-icon name="calendar-outline" color="primary"></ion-icon>
                   <span>{{ formatDate(appointment.date) }}</span>
                 </div>
@@ -123,9 +127,6 @@ import { LocalNotificationService } from '../../../services/local-notification.s
                 </div>
               </div>
 
-              <div *ngIf="appointment.symptoms" class="symptoms">
-                <p><strong>Symptoms:</strong> {{ appointment.symptoms }}</p>
-              </div>
 
               <div class="appointment-footer">
                
@@ -372,7 +373,6 @@ import { LocalNotificationService } from '../../../services/local-notification.s
     @media (max-width: 768px) {
       .appointment-footer {
         flex-direction: column;
-        align-items: flex-start;
         gap: 1rem;
       }
       
@@ -441,7 +441,7 @@ export class PatientAppointmentsPage implements OnInit {
   private handleBackButtonClick(event: Event) {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Check if user is authenticated before navigation
     const currentUser = this.authService.getCurrentUser();
     if (currentUser) {
@@ -466,7 +466,24 @@ export class PatientAppointmentsPage implements OnInit {
       // Fetch appointments from Firebase
       this.firebaseService.getAppointmentsByPatient(currentUser.uid).subscribe({
         next: (appointments) => {
-          this.appointments = appointments;
+          console.log('Loaded appointments:', appointments);
+          // Debug: Check if patientName is present
+          appointments.forEach((apt, index) => {
+            console.log(`Appointment ${index}:`, {
+              id: apt.id,
+              patientName: apt.patientName,
+              doctorName: apt.doctorName,
+              date: apt.date,
+              time: apt.time
+            });
+          });
+
+          // Fill in missing patient names with current user's name
+          this.appointments = appointments.map(apt => ({
+            ...apt,
+            patientName: apt.patientName || currentUser.name || 'Patient'
+          }));
+
           this.filterAppointments();
           this.isLoading = false;
         },
@@ -493,19 +510,25 @@ export class PatientAppointmentsPage implements OnInit {
     this.firebaseService.getAppointmentsByPatient(currentUser.uid).subscribe({
       next: (appointments) => {
         console.log('[AppointmentsPage] 📋 Appointments updated, count:', appointments.length);
-        
+
+        // Fill in missing patient names with current user's name
+        const appointmentsWithNames = appointments.map(apt => ({
+          ...apt,
+          patientName: apt.patientName || currentUser.name || 'Patient'
+        }));
+
         // Check for status changes BEFORE updating the appointments array
-        appointments.forEach(appointment => {
+        appointmentsWithNames.forEach(appointment => {
           if (!appointment.id) return;
-          
+
           const previousStatus = this.previousAppointmentStatuses.get(appointment.id);
           const currentStatus = appointment.status;
-          
+
           console.log('[AppointmentsPage] 🔍 Checking appointment:', appointment.id, {
             previousStatus: previousStatus,
             currentStatus: currentStatus
           });
-          
+
           // Only trigger notification if we have a previous status (not first load)
           // and status changed from pending to confirmed
           if (previousStatus && previousStatus === 'pending' && currentStatus === 'confirmed') {
@@ -516,7 +539,7 @@ export class PatientAppointmentsPage implements OnInit {
               time: appointment.time,
               appointmentType: appointment.appointmentType
             });
-            
+
             // Trigger local notification
             this.localNotificationService.sendAppointmentConfirmedNotification(appointment)
               .then(() => {
@@ -525,17 +548,17 @@ export class PatientAppointmentsPage implements OnInit {
               .catch((error) => {
                 console.error('[AppointmentsPage] ❌ Error sending notification:', error);
               });
-            
+
             // Show toast as well for immediate feedback
             this.showToast(`Your appointment with Dr. ${appointment.doctorName} has been confirmed!`, 'success');
           }
-          
+
           // Update the status tracking map
           this.previousAppointmentStatuses.set(appointment.id, currentStatus);
         });
-        
+
         // Update appointments list
-        this.appointments = appointments;
+        this.appointments = appointmentsWithNames;
         this.filterAppointments();
       },
       error: (error) => {
@@ -708,7 +731,11 @@ export class PatientAppointmentsPage implements OnInit {
           text: 'Yes, Cancel',
           handler: async (data) => {
             try {
-              await this.appointmentService.cancelAppointment(appointment.id);
+              await this.appointmentService.cancelAppointment({
+                appointmentId: appointment.id,
+                reason: data.reason || 'Cancelled by patient',
+                cancelledBy: 'patient'
+              });
               await this.loadAppointments(); // Refresh the list
               await this.showToast('Appointment cancelled successfully', 'success');
             } catch (error) {

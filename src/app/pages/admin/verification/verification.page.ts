@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { 
+import {
   IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardContent,
   IonButton, IonIcon, IonText, IonBackButton, IonButtons
 } from '@ionic/angular/standalone';
@@ -57,5 +57,5 @@ export class AdminVerificationPage implements OnInit {
     addIcons({ checkmarkCircleOutline });
   }
 
-  ngOnInit() {}
+  ngOnInit() { }
 }
