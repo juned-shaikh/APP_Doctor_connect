@@ -86,9 +86,6 @@ import { Subscription } from 'rxjs';
             <ion-card-content>
               <div class="booking-header">
                 <div class="patient-info">
-                  <ion-avatar>
-                    <img [src]="booking.patientAvatar || 'assets/default-patient.png'" [alt]="booking.patientName">
-                  </ion-avatar>
                   <div class="patient-details">
                     <h3>{{ booking.patientName }}</h3>
                     <p class="age-gender">{{ booking.patientAge }} years, {{ booking.patientGender }}</p>
@@ -101,7 +98,7 @@ import { Subscription } from 'rxjs';
                     <ion-label>{{ booking.status }}</ion-label>
                   </ion-chip>
                   <ion-button fill="clear" size="small" (click)="showBookingActions(booking)">
-                    <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+                    <ion-icon name="ellipsis-vertical-outline" style="color:white"></ion-icon>
                   </ion-button>
                 </div>
               </div>
@@ -125,9 +122,6 @@ import { Subscription } from 'rxjs';
                 </div>
               </div>
 
-              <div *ngIf="booking.symptoms" class="symptoms">
-                <p><strong>Symptoms/Reason:</strong> {{ booking.symptoms }}</p>
-              </div>
 
               <div class="booking-footer">
                 <div class="action-buttons">
@@ -143,10 +137,7 @@ import { Subscription } from 'rxjs';
                     <ion-icon [name]="booking.appointmentType === 'video' ? 'videocam-outline' : 'person-outline'" slot="start"></ion-icon>
                     {{ booking.appointmentType === 'video' ? 'Start Video Call' : 'Mark Present' }}
                   </ion-button>
-                  <ion-button *ngIf="booking.status === 'completed'" fill="outline" size="small" (click)="viewPrescription(booking)">
-                    <ion-icon name="document-text-outline" slot="start"></ion-icon>
-                    Prescription
-                  </ion-button>
+                 
                 </div>
               </div>
             </ion-card-content>

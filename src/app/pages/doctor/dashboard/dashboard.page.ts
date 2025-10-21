@@ -41,9 +41,7 @@ import { AuthService, User } from 'src/app/services/auth.service';
         <!-- Welcome Section -->
         <div class="welcome-section">
           <div class="doctor-info">
-            <ion-avatar>
-              <img [src]="currentUser?.avatar || 'assets/default-doctor.png'" [alt]="currentUser?.name">
-            </ion-avatar>
+           
             <div class="doctor-details">
               <ion-text color="primary">
                 <h2>Welcome, Dr. {{ currentUser?.name }}!</h2>
@@ -184,7 +182,7 @@ import { AuthService, User } from 'src/app/services/auth.service';
             <ion-text color="dark">
               <h3>Today's Appointments</h3>
             </ion-text>
-            <ion-button fill="clear" size="small" (click)="viewAllAppointments()">
+            <ion-button fill="clear" size="small" (click)="viewAllAppointments()" style="color:white">
               View All
             </ion-button>
           </div>
