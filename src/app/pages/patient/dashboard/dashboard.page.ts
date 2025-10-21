@@ -15,7 +15,7 @@ import {
   medicalOutline, eyeOutline, personOutline, bodyOutline,
   womanOutline, pulseOutline, happyOutline, locationOutline, starOutline,
   ellipsisVerticalOutline, logOutOutline, settingsOutline, briefcaseOutline,
-  pricetagOutline
+  pricetagOutline, peopleCircleOutline, fitnessOutline, headsetOutline
 } from 'ionicons/icons';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
@@ -72,34 +72,10 @@ interface DashboardDoctor {
           </ion-searchbar>
         </div>
 
-        <!-- Quick Actions (simplified) -->
-        <!-- <div class="quick-actions">
-          <ion-grid>
-            <ion-row>
-              <ion-col size="6">
-                <ion-card class="action-card" (click)="viewAppointments()">
-                  <ion-card-content>
-                    <ion-icon name="calendar-outline" color="success"></ion-icon>
-                    <p>My Appointments</p>
-                  </ion-card-content>
-                </ion-card>
-              </ion-col>
-              <ion-col size="6">
-                <ion-card class="action-card" (click)="viewProfile()">
-                  <ion-card-content>
-                    <ion-icon name="person-outline" color="warning"></ion-icon>
-                    <p>My Profile</p>
-                  </ion-card-content>
-                </ion-card>
-              </ion-col>
-            </ion-row>
-          </ion-grid>
-        </div>-->
-
         <!-- Browse by Specialization -->
-      <!--   <div class="specializations-section">
+        <div class="specializations-section">
           <ion-text color="dark">
-            <h3>Browse by Specialization</h3>
+            <h3>Filter by Specialization</h3>
           </ion-text>
           <div class="specialization-chips">
             <ion-chip 
@@ -109,22 +85,35 @@ interface DashboardDoctor {
               <ion-icon name="medical-outline" color="primary"></ion-icon>
               <ion-label>All</ion-label>
             </ion-chip>
+            <!-- Dynamic specializations from actual data -->
             <ion-chip 
-              *ngFor="let spec of specializations" 
-              (click)="selectSpecialization(spec.value)"
-              [outline]="selectedSpecialization !== spec.value"
+              *ngFor="let spec of availableSpecializations" 
+              (click)="selectSpecialization(spec)"
+              [outline]="selectedSpecialization !== spec"
               class="specialization-chip">
-              <ion-icon [name]="spec.icon" color="primary"></ion-icon>
-              <ion-label>{{ spec.name }}</ion-label>
+              <ion-icon name="medical-outline" color="primary"></ion-icon>
+              <ion-label>{{ spec | titlecase }}</ion-label>
             </ion-chip>
           </div>
-        </div>-->
+        </div>
 
         <!-- Search Results Info -->
         <div class="search-results-info" *ngIf="searchQuery && searchQuery.trim() !== ''">
           <ion-text color="medium">
             <p>{{ visibleDoctors.length }} doctor{{ visibleDoctors.length !== 1 ? 's' : '' }} found for "{{ searchQuery }}"</p>
           </ion-text>
+        </div>
+
+        <!-- No Results Message -->
+        <div class="no-results" *ngIf="visibleDoctors.length === 0 && allDoctors.length > 0">
+          <ion-card>
+            <ion-card-content class="text-center">
+              <ion-icon name="search-outline" size="large" color="medium"></ion-icon>
+              <h3>No doctors found</h3>
+              <p>Try adjusting your search or filter criteria</p>
+              <ion-button fill="outline" (click)="clearAllFilters()">Clear Filters</ion-button>
+            </ion-card-content>
+          </ion-card>
         </div>
 
         <!-- Doctors List (live, filtered, featured on top) -->
@@ -696,6 +685,10 @@ interface DashboardDoctor {
     .kv .k { color: #6b7280; font-size: 0.9rem; }
     .kv .v { color: #111827; }
     .cta { margin-top: 12px; }
+    .no-results { margin: 2rem 0; }
+    .no-results .text-center { text-align: center; padding: 2rem 1rem; }
+    .no-results h3 { margin: 1rem 0 0.5rem 0; color: var(--ion-color-medium); }
+    .no-results p { margin: 0 0 1.5rem 0; color: var(--ion-color-medium); }
   `],
   imports: [
     CommonModule,
@@ -710,14 +703,18 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
   currentUser: User | null = null;
 
   specializations = [
-    { name: 'General Medicine', value: 'general-medicine', icon: 'medical-outline' },
+    { name: 'General Medicine', value: 'general medicine', icon: 'medical-outline' },
+    { name: 'General Physician', value: 'general physician', icon: 'medical-outline' },
     { name: 'Cardiology', value: 'cardiology', icon: 'heart-outline' },
     { name: 'Dermatology', value: 'dermatology', icon: 'eye-outline' },
-    { name: 'Pediatrics', value: 'pediatrics', icon: 'baby-outline' },
-    { name: 'Orthopedics', value: 'orthopedics', icon: 'boneto-outline' },
+    { name: 'Pediatrics', value: 'pediatrics', icon: 'people-circle-outline' },
+    { name: 'Orthopedics', value: 'orthopedics', icon: 'fitness-outline' },
     { name: 'Gynecology', value: 'gynecology', icon: 'woman-outline' },
-    { name: 'Neurology', value: 'neurology', icon: 'brain-outline' },
-    { name: 'Psychiatry', value: 'psychiatry', icon: 'happy-outline' }
+    { name: 'Neurology', value: 'neurology', icon: 'headset-outline' },
+    { name: 'Psychiatry', value: 'psychiatry', icon: 'happy-outline' },
+    { name: 'ENT', value: 'ent', icon: 'headset-outline' },
+    { name: 'Ophthalmology', value: 'ophthalmology', icon: 'eye-outline' },
+    { name: 'Dentistry', value: 'dentistry', icon: 'medical-outline' }
   ];
 
   // Profile modal state
@@ -730,6 +727,7 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
   // Source and visible lists
   allDoctors: DashboardDoctor[] = [];
   visibleDoctors: DashboardDoctor[] = [];
+  availableSpecializations: string[] = [];
 
   // UI filter state
   selectedSpecialization: string = 'all';
@@ -764,7 +762,7 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
       medicalOutline, heartOutline, eyeOutline, bodyOutline, pulseOutline,
       womanOutline, happyOutline, locationOutline, starOutline,
       ellipsisVerticalOutline, logOutOutline, settingsOutline, briefcaseOutline,
-      pricetagOutline
+      pricetagOutline, peopleCircleOutline, fitnessOutline, headsetOutline
     });
   }
 
@@ -811,6 +809,16 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
         });
       // Use mapped list directly; Firestore stream already returns only active doctors
       this.allDoctors = mapped;
+
+      // Update available specializations based on actual data
+      this.availableSpecializations = [...new Set(mapped
+        .map(d => d.specialization)
+        .filter(Boolean)
+        .map(s => s!.toLowerCase().trim())
+      )].sort();
+
+      console.log('Available specializations from data:', this.availableSpecializations);
+
       this.applyFilters();
     });
   }
@@ -818,11 +826,23 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
   private applyFilters() {
     let filtered = this.allDoctors;
 
+    // Debug: Log all available specializations
+    const uniqueSpecs = [...new Set(this.allDoctors.map(d => d.specialization).filter(Boolean))];
+    console.log('Available specializations:', uniqueSpecs);
+    console.log('Selected specialization:', this.selectedSpecialization);
+    console.log('Total doctors:', this.allDoctors.length);
+
     // Apply specialization filter
     if (this.selectedSpecialization !== 'all') {
-      filtered = filtered.filter(d =>
-        (d.specialization || '').toLowerCase() === this.selectedSpecialization.toLowerCase()
-      );
+      const selectedSpec = this.selectedSpecialization.toLowerCase().replace(/-/g, ' ');
+      filtered = filtered.filter(d => {
+        const doctorSpec = (d.specialization || '').toLowerCase().replace(/-/g, ' ').trim();
+        const match = doctorSpec === selectedSpec || doctorSpec.includes(selectedSpec) || selectedSpec.includes(doctorSpec);
+        if (match) {
+          console.log(`Match found: "${doctorSpec}" matches "${selectedSpec}"`);
+        }
+        return match;
+      });
     }
 
     // Apply search query filter
@@ -835,6 +855,7 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
       );
     }
 
+    console.log('Filtered doctors:', filtered.length);
     this.visibleDoctors = this.sortDoctors(filtered);
   }
 
@@ -899,6 +920,12 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
 
   onSearchClear() {
     this.searchQuery = '';
+    this.applyFilters();
+  }
+
+  clearAllFilters() {
+    this.searchQuery = '';
+    this.selectedSpecialization = 'all';
     this.applyFilters();
   }
 
