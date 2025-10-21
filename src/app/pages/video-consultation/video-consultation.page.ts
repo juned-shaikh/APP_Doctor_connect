@@ -44,6 +44,15 @@ export class VideoConsultationPage implements OnInit, OnDestroy {
   permissionStatus: PermissionStatus = { camera: false, microphone: false, hasPermissions: false };
   showAdvancedOptions: boolean = false;
   hasCallEnded: boolean = false;
+  
+  // Call quality and duration tracking
+  callDuration: string = '';
+  connectionQualityIcon: string = 'wifi';
+  connectionQualityColor: string = 'medium';
+  connectionQualityText: string = 'Good';
+  private callStartTime: Date | null = null;
+  private durationInterval: any = null;
+  private qualityCheckInterval: any = null;
 
   // Track video element states to prevent conflicts
   private localVideoPlaying: boolean = false;
@@ -186,6 +195,14 @@ export class VideoConsultationPage implements OnInit, OnDestroy {
     if (this.remoteVideoTimeout) {
       clearTimeout(this.remoteVideoTimeout);
     }
+    
+    // Clear duration and quality intervals
+    if (this.durationInterval) {
+      clearInterval(this.durationInterval);
+    }
+    if (this.qualityCheckInterval) {
+      clearInterval(this.qualityCheckInterval);
+    }
 
     // Only end call if we're actually in a call, not just navigating back
     if (this.callState.isInCall || this.callState.isConnecting) {
@@ -309,6 +326,11 @@ export class VideoConsultationPage implements OnInit, OnDestroy {
         await this.videoCallService.initializeCall(this.callId, this.isDoctor);
       }
 
+      // Set up periodic video element verification for rejoin scenarios
+      if (this.hasCallEnded) {
+        this.setupRejoinVideoVerification();
+      }
+
       // Wait a moment for streams to be established, then refresh video elements
       setTimeout(() => {
         this.refreshVideoElements();
@@ -358,34 +380,7 @@ export class VideoConsultationPage implements OnInit, OnDestroy {
       
       // Check if this is the same stream to avoid conflicts
       if (localVideoEl.srcObject !== currentState.localStream) {
-        // Pause current video to prevent conflicts
-        if (!localVideoEl.paused) {
-          localVideoEl.pause();
-        }
-        
-        // Wait a moment before setting new stream
-        setTimeout(() => {
-          localVideoEl.srcObject = currentState.localStream || null;
-          
-          // Force play and handle any errors
-          localVideoEl.play().then(() => {
-            console.log('Local video playing successfully');
-            if (currentState.localStream) {
-              this.isVideoEnabled = currentState.localStream.getVideoTracks().some(track => track.enabled);
-              this.isAudioEnabled = currentState.localStream.getAudioTracks().some(track => track.enabled);
-            }
-          }).catch(error => {
-            console.error('Error playing local video:', error);
-            // Only retry if it's not an AbortError
-            if (error.name !== 'AbortError') {
-              setTimeout(() => {
-                if (localVideoEl.srcObject === currentState.localStream) {
-                  localVideoEl.play().catch(e => console.error('Retry local video failed:', e));
-                }
-              }, 500);
-            }
-          });
-        }, 100);
+        this.setVideoElementStream(localVideoEl, currentState.localStream, 'local');
       }
     } else {
       console.log('Local stream or video element not available');
@@ -400,33 +395,113 @@ export class VideoConsultationPage implements OnInit, OnDestroy {
       
       // Check if this is the same stream to avoid conflicts
       if (remoteVideoEl.srcObject !== currentState.remoteStream) {
-        // Pause current video to prevent conflicts
-        if (!remoteVideoEl.paused) {
-          remoteVideoEl.pause();
-        }
-        
-        // Wait a moment before setting new stream
-        setTimeout(() => {
-          remoteVideoEl.srcObject = currentState.remoteStream || null;
-          
-          // Force play and handle any errors
-          remoteVideoEl.play().then(() => {
-            console.log('Remote video playing successfully');
-          }).catch(error => {
-            console.error('Error playing remote video:', error);
-            // Only retry if it's not an AbortError
-            if (error.name !== 'AbortError') {
-              setTimeout(() => {
-                if (remoteVideoEl.srcObject === currentState.remoteStream) {
-                  remoteVideoEl.play().catch(e => console.error('Retry remote video failed:', e));
-                }
-              }, 500);
-            }
-          });
-        }, 100);
+        this.setVideoElementStream(remoteVideoEl, currentState.remoteStream, 'remote');
       }
     } else {
       console.log('Remote stream or video element not available');
+    }
+  }
+
+  private async setVideoElementStream(videoElement: HTMLVideoElement, stream: MediaStream, type: 'local' | 'remote'): Promise<void> {
+    try {
+      console.log(`Setting ${type} video element stream`);
+      
+      // Remove any existing event listeners to prevent conflicts
+      videoElement.onloadedmetadata = null;
+      videoElement.oncanplay = null;
+      
+      // Pause and clear current stream
+      if (!videoElement.paused) {
+        videoElement.pause();
+      }
+      videoElement.srcObject = null;
+      
+      // Wait for cleanup
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Set video element properties to prevent artifacts
+      videoElement.style.objectFit = 'cover';
+      videoElement.style.transform = 'scaleX(1)'; // Ensure no mirroring issues
+      
+      // Set new stream
+      videoElement.srcObject = stream;
+      
+      // Disable context menu and other interactions that might show controls
+      videoElement.oncontextmenu = (e) => e.preventDefault();
+      videoElement.ondblclick = (e) => e.preventDefault();
+      videoElement.onmousedown = (e) => {
+        if (e.button === 2) e.preventDefault(); // Right click
+      };
+      
+      // Add error handling for video rendering issues
+      videoElement.onerror = (error) => {
+        console.error(`${type} video element error:`, error);
+        // Try to recover from video rendering errors
+        setTimeout(() => {
+          if (videoElement.srcObject === stream) {
+            console.log(`Attempting to recover ${type} video from rendering error`);
+            videoElement.load();
+          }
+        }, 1000);
+      };
+      
+      // Set up event handlers for better control
+      videoElement.onloadedmetadata = () => {
+        console.log(`${type} video metadata loaded`);
+        this.playVideoElement(videoElement, type);
+      };
+      
+      videoElement.oncanplay = () => {
+        console.log(`${type} video can play`);
+        this.playVideoElement(videoElement, type);
+      };
+      
+      // Force load the video
+      videoElement.load();
+      
+      // Try to play immediately as well
+      setTimeout(() => {
+        this.playVideoElement(videoElement, type);
+      }, 200);
+      
+    } catch (error) {
+      console.error(`Error setting ${type} video stream:`, error);
+    }
+  }
+
+  private async playVideoElement(videoElement: HTMLVideoElement, type: 'local' | 'remote'): Promise<void> {
+    try {
+      // Ensure video is ready to play
+      if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA
+        await videoElement.play();
+        console.log(`${type} video playing successfully`);
+        
+        // Update control states for local video
+        if (type === 'local' && videoElement.srcObject) {
+          const stream = videoElement.srcObject as MediaStream;
+          this.isVideoEnabled = stream.getVideoTracks().some(track => track.enabled);
+          this.isAudioEnabled = stream.getAudioTracks().some(track => track.enabled);
+        }
+      }
+    } catch (error: any) {
+      console.error(`Error playing ${type} video:`, error);
+      
+      // Don't retry for AbortError as it means interrupted by new load
+      if (error.name !== 'AbortError') {
+        // Retry once after a delay
+        setTimeout(async () => {
+          try {
+            if (videoElement.readyState >= 2) {
+              await videoElement.play();
+              console.log(`${type} video retry successful`);
+            }
+          } catch (retryError: any) {
+            if (retryError.name !== 'AbortError') {
+              console.error(`${type} video retry failed:`, retryError);
+            }
+          }
+        }, 1000);
+      }
     }
   }
 
@@ -447,80 +522,45 @@ export class VideoConsultationPage implements OnInit, OnDestroy {
 
       this.callState = state;
 
+      // Handle call start/end for duration tracking
+      if (state.isInCall && !this.callStartTime) {
+        this.startCallDurationTracking();
+      } else if (!state.isInCall && this.callStartTime) {
+        this.stopCallDurationTracking();
+      }
+
       // Update video elements when streams are available with enhanced handling
       if (state.localStream && this.localVideo) {
         console.log('Setting local video stream from call state:', state.localStream);
-        console.log('Local video element:', this.localVideo.nativeElement);
-
         const localVideoEl = this.localVideo.nativeElement;
         
-        // Check if this is the same stream to avoid conflicts
-        if (localVideoEl.srcObject !== state.localStream) {
-          // Pause current video to prevent conflicts
-          if (!localVideoEl.paused) {
-            localVideoEl.pause();
-          }
-          
-          // Wait a moment before setting new stream
-          setTimeout(() => {
-            localVideoEl.srcObject = state.localStream || null;
-            
-            // Enhanced play handling with conflict prevention
-            localVideoEl.play().then(() => {
-              console.log('Local video from call state playing successfully');
-              // Update control states
-              if (state.localStream) {
-                this.isVideoEnabled = state.localStream.getVideoTracks().some(track => track.enabled);
-                this.isAudioEnabled = state.localStream.getAudioTracks().some(track => track.enabled);
-              }
-            }).catch(error => {
-              console.error('Error playing local video from call state:', error);
-              // Only retry if it's not an AbortError (interrupted by new load)
-              if (error.name !== 'AbortError') {
-                setTimeout(() => {
-                  if (localVideoEl.srcObject === state.localStream) {
-                    localVideoEl.play().catch(e => console.error('Retry local video from call state failed:', e));
-                  }
-                }, 1000);
-              }
-            });
-          }, 100);
+        // Always refresh video element during rejoin or if stream is different
+        if (localVideoEl.srcObject !== state.localStream || this.hasCallEnded) {
+          this.setVideoElementStream(localVideoEl, state.localStream, 'local');
         }
       }
 
       if (state.remoteStream && this.remoteVideo) {
         console.log('Setting remote video stream from call state:', state.remoteStream);
-        console.log('Remote video element:', this.remoteVideo.nativeElement);
-
         const remoteVideoEl = this.remoteVideo.nativeElement;
         
-        // Check if this is the same stream to avoid conflicts
-        if (remoteVideoEl.srcObject !== state.remoteStream) {
-          // Pause current video to prevent conflicts
-          if (!remoteVideoEl.paused) {
-            remoteVideoEl.pause();
-          }
-          
-          // Wait a moment before setting new stream
-          setTimeout(() => {
-            remoteVideoEl.srcObject = state.remoteStream || null;
-            
-            // Enhanced play handling with conflict prevention
-            remoteVideoEl.play().then(() => {
-              console.log('Remote video from call state playing successfully');
-            }).catch(error => {
-              console.error('Error playing remote video from call state:', error);
-              // Only retry if it's not an AbortError (interrupted by new load)
-              if (error.name !== 'AbortError') {
-                setTimeout(() => {
-                  if (remoteVideoEl.srcObject === state.remoteStream) {
-                    remoteVideoEl.play().catch(e => console.error('Retry remote video from call state failed:', e));
-                  }
-                }, 1000);
-              }
-            });
-          }, 100);
+        // Always refresh video element during rejoin or if stream is different
+        if (remoteVideoEl.srcObject !== state.remoteStream || this.hasCallEnded) {
+          this.setVideoElementStream(remoteVideoEl, state.remoteStream, 'remote');
         }
+      }
+
+      // Special handling for rejoin scenarios - force refresh all video elements
+      if (this.hasCallEnded && state.isInCall && (state.localStream || state.remoteStream)) {
+        console.log('Rejoin detected with streams - forcing video refresh');
+        setTimeout(() => {
+          this.forceRefreshAllVideoElements();
+        }, 1000);
+      }
+
+      // Start quality monitoring when both streams are available
+      if (state.isInCall && state.localStream && state.remoteStream && !this.qualityCheckInterval) {
+        this.startQualityMonitoring();
       }
 
       if (state.error) {
@@ -1383,6 +1423,104 @@ This will clear all cached permissions and allow fresh permission requests.`,
     await alert.present();
   }
 
+  async rejoinCall() {
+    console.log('Manual rejoin call triggered');
+    
+    const loading = await this.toastController.create({
+      message: 'Rejoining call...',
+      duration: 3000,
+      color: 'primary'
+    });
+    await loading.present();
+
+    try {
+      // Mark as rejoining
+      this.hasCallEnded = true;
+      
+      // Clear any error state
+      this.videoCallService.clearError();
+      
+      // Rejoin the call
+      await this.videoCallService.rejoinCall(this.callId, this.isDoctor);
+      
+      // Set up verification for the rejoin
+      this.setupRejoinVideoVerification();
+      
+      const successToast = await this.toastController.create({
+        message: 'Successfully rejoined the call',
+        duration: 2000,
+        color: 'success'
+      });
+      await successToast.present();
+      
+    } catch (error) {
+      console.error('Manual rejoin failed:', error);
+      
+      const errorToast = await this.toastController.create({
+        message: 'Failed to rejoin call. Please try again.',
+        duration: 3000,
+        color: 'danger'
+      });
+      await errorToast.present();
+    }
+  }
+
+  async fixVideoQuality() {
+    console.log('Attempting to fix video quality issues');
+    
+    const loading = await this.toastController.create({
+      message: 'Fixing video quality...',
+      duration: 2000,
+      color: 'primary'
+    });
+    await loading.present();
+
+    try {
+      // Get current streams
+      const currentState = this.videoCallService.getCurrentCallState();
+      
+      // Reset video elements with better settings
+      if (currentState.localStream && this.localVideo) {
+        const localEl = this.localVideo.nativeElement;
+        
+        // Reset video element properties
+        localEl.style.imageRendering = 'auto';
+        localEl.style.filter = 'none';
+        localEl.style.transform = 'scaleX(-1)'; // Mirror for local video
+        
+        await this.forceSetVideoStream(localEl, currentState.localStream, 'local');
+      }
+      
+      if (currentState.remoteStream && this.remoteVideo) {
+        const remoteEl = this.remoteVideo.nativeElement;
+        
+        // Reset video element properties
+        remoteEl.style.imageRendering = 'auto';
+        remoteEl.style.filter = 'none';
+        remoteEl.style.transform = 'none'; // No mirroring for remote video
+        
+        await this.forceSetVideoStream(remoteEl, currentState.remoteStream, 'remote');
+      }
+      
+      const successToast = await this.toastController.create({
+        message: 'Video quality improved',
+        duration: 2000,
+        color: 'success'
+      });
+      await successToast.present();
+      
+    } catch (error) {
+      console.error('Failed to fix video quality:', error);
+      
+      const errorToast = await this.toastController.create({
+        message: 'Could not fix video quality. Try rejoining the call.',
+        duration: 3000,
+        color: 'warning'
+      });
+      await errorToast.present();
+    }
+  }
+
   async forceRefreshVideo() {
     console.log('Force refreshing video elements...');
 
@@ -1403,40 +1541,72 @@ This will clear all cached permissions and allow fresh permission requests.`,
     const currentState = this.videoCallService.getCurrentCallState();
     console.log('Current state for force refresh:', currentState);
 
-    // Force refresh local video
-    if (currentState.localStream && this.localVideo) {
-      const localEl = this.localVideo.nativeElement;
-      console.log('Force setting local video stream');
+    // Show loading indicator during refresh
+    const toast = await this.toastController.create({
+      message: 'Refreshing video connection...',
+      duration: 3000,
+      color: 'primary'
+    });
+    await toast.present();
 
-      // Clear and reset
-      localEl.srcObject = null;
-      await new Promise(resolve => setTimeout(resolve, 100));
-      localEl.srcObject = currentState.localStream || null;
+    try {
+      // Force refresh all video elements using the comprehensive method
+      await this.forceRefreshAllVideoElements();
 
-      try {
-        await localEl.play();
-        console.log('Force refresh local video successful');
-      } catch (error) {
-        console.error('Force refresh local video failed:', error);
+      // If we still don't have remote stream but we're in a call, try to renegotiate
+      const updatedState = this.videoCallService.getCurrentCallState();
+      if (!updatedState.remoteStream && updatedState.isInCall) {
+        console.log('No remote stream after refresh, attempting renegotiation...');
+        
+        // Try to rejoin the call completely
+        try {
+          await this.videoCallService.rejoinCall(this.callId, this.isDoctor);
+          
+          // Wait a bit and check again
+          setTimeout(async () => {
+            const finalState = this.videoCallService.getCurrentCallState();
+            if (finalState.remoteStream && this.remoteVideo) {
+              console.log('Remote stream restored after rejoin, setting video element');
+              await this.forceSetVideoStream(this.remoteVideo.nativeElement, finalState.remoteStream, 'remote');
+            }
+          }, 2000);
+          
+        } catch (error) {
+          console.error('Rejoin during refresh failed:', error);
+          
+          // Last resort: try to create new offer
+          if (this.isDoctor) {
+            try {
+              await this.videoCallService.createNewOffer(this.callId);
+            } catch (offerError) {
+              console.error('New offer creation failed:', offerError);
+            }
+          }
+        }
       }
-    }
 
-    // Force refresh remote video
-    if (currentState.remoteStream && this.remoteVideo) {
-      const remoteEl = this.remoteVideo.nativeElement;
-      console.log('Force setting remote video stream');
+      // Success message
+      setTimeout(async () => {
+        const finalState = this.videoCallService.getCurrentCallState();
+        if (finalState.remoteStream || finalState.localStream) {
+          const successToast = await this.toastController.create({
+            message: 'Video connection refreshed successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await successToast.present();
+        }
+      }, 1500);
 
-      // Clear and reset
-      remoteEl.srcObject = null;
-      await new Promise(resolve => setTimeout(resolve, 100));
-      remoteEl.srcObject = currentState.remoteStream || null;
-
-      try {
-        await remoteEl.play();
-        console.log('Force refresh remote video successful');
-      } catch (error) {
-        console.error('Force refresh remote video failed:', error);
-      }
+    } catch (error) {
+      console.error('Force refresh failed:', error);
+      
+      const errorToast = await this.toastController.create({
+        message: 'Failed to refresh video. Try rejoining the call.',
+        duration: 3000,
+        color: 'warning'
+      });
+      await errorToast.present();
     }
   }
 
@@ -1473,6 +1643,317 @@ This will clear all cached permissions and allow fresh permission requests.`,
       console.log('Manually setting remote stream...');
       this.remoteVideo.nativeElement.srcObject = this.callState.remoteStream;
       await this.remoteVideo.nativeElement.play();
+    }
+  }
+
+  private setupRejoinVideoVerification(): void {
+    console.log('Setting up rejoin video verification');
+    
+    // Check video elements every 3 seconds for the first 30 seconds after rejoin
+    let checkCount = 0;
+    const maxChecks = 10;
+    
+    const verificationInterval = setInterval(() => {
+      checkCount++;
+      console.log(`Rejoin verification check ${checkCount}/${maxChecks}`);
+      
+      const currentState = this.videoCallService.getCurrentCallState();
+      
+      // Check if we have streams but video elements are not playing
+      if (currentState.localStream && this.localVideo) {
+        const localEl = this.localVideo.nativeElement;
+        if (localEl.srcObject !== currentState.localStream || localEl.paused) {
+          console.log('Local video needs refresh during rejoin verification');
+          this.setVideoElementStream(localEl, currentState.localStream, 'local');
+        }
+      }
+      
+      if (currentState.remoteStream && this.remoteVideo) {
+        const remoteEl = this.remoteVideo.nativeElement;
+        if (remoteEl.srcObject !== currentState.remoteStream || remoteEl.paused) {
+          console.log('Remote video needs refresh during rejoin verification');
+          this.setVideoElementStream(remoteEl, currentState.remoteStream, 'remote');
+        }
+      }
+      
+      // Stop checking after max checks or if both streams are working
+      if (checkCount >= maxChecks || 
+          (currentState.localStream && currentState.remoteStream && 
+           this.localVideo && this.remoteVideo &&
+           !this.localVideo.nativeElement.paused && !this.remoteVideo.nativeElement.paused)) {
+        console.log('Rejoin verification complete');
+        clearInterval(verificationInterval);
+      }
+    }, 3000);
+  }
+
+  private async forceRefreshAllVideoElements(): Promise<void> {
+    console.log('Force refreshing all video elements for rejoin');
+    
+    const currentState = this.videoCallService.getCurrentCallState();
+    
+    // Force refresh both video elements
+    const refreshPromises: Promise<void>[] = [];
+    
+    if (currentState.localStream && this.localVideo) {
+      console.log('Force refreshing local video element');
+      refreshPromises.push(this.forceSetVideoStream(this.localVideo.nativeElement, currentState.localStream, 'local'));
+    }
+    
+    if (currentState.remoteStream && this.remoteVideo) {
+      console.log('Force refreshing remote video element');
+      refreshPromises.push(this.forceSetVideoStream(this.remoteVideo.nativeElement, currentState.remoteStream, 'remote'));
+    }
+    
+    try {
+      await Promise.all(refreshPromises);
+      console.log('All video elements refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing video elements:', error);
+    }
+  }
+
+  private async forceSetVideoStream(videoElement: HTMLVideoElement, stream: MediaStream, type: 'local' | 'remote'): Promise<void> {
+    try {
+      console.log(`Force setting ${type} video stream`);
+      
+      // Completely reset the video element
+      videoElement.pause();
+      videoElement.srcObject = null;
+      videoElement.load();
+      
+      // Wait for reset
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Set the stream
+      videoElement.srcObject = stream;
+      
+      // Remove any existing event listeners
+      videoElement.onloadedmetadata = null;
+      videoElement.oncanplay = null;
+      videoElement.onplay = null;
+      
+      // Set up fresh event listeners
+      return new Promise((resolve, reject) => {
+        let resolved = false;
+        
+        const cleanup = () => {
+          videoElement.onloadedmetadata = null;
+          videoElement.oncanplay = null;
+          videoElement.onerror = null;
+        };
+        
+        const tryPlay = async () => {
+          try {
+            await videoElement.play();
+            console.log(`${type} video playing after force refresh`);
+            if (!resolved) {
+              resolved = true;
+              cleanup();
+              resolve();
+            }
+          } catch (error) {
+            console.error(`Error playing ${type} video after force refresh:`, error);
+            if (!resolved) {
+              resolved = true;
+              cleanup();
+              reject(error);
+            }
+          }
+        };
+        
+        videoElement.onloadedmetadata = () => {
+          console.log(`${type} video metadata loaded - attempting play`);
+          tryPlay();
+        };
+        
+        videoElement.oncanplay = () => {
+          console.log(`${type} video can play - attempting play`);
+          tryPlay();
+        };
+        
+        videoElement.onerror = (error) => {
+          console.error(`${type} video error:`, error);
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            reject(error);
+          }
+        };
+        
+        // Force load and try to play immediately
+        videoElement.load();
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (!resolved) {
+            console.log(`${type} video force play timeout - trying anyway`);
+            tryPlay();
+          }
+        }, 1000);
+      });
+      
+    } catch (error) {
+      console.error(`Error force setting ${type} video stream:`, error);
+      throw error;
+    }
+  }
+
+  private startCallDurationTracking(): void {
+    this.callStartTime = new Date();
+    this.durationInterval = setInterval(() => {
+      if (this.callStartTime) {
+        const now = new Date();
+        const diff = now.getTime() - this.callStartTime.getTime();
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        this.callDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }, 1000);
+  }
+
+  private stopCallDurationTracking(): void {
+    if (this.durationInterval) {
+      clearInterval(this.durationInterval);
+      this.durationInterval = null;
+    }
+    this.callStartTime = null;
+    this.callDuration = '';
+  }
+
+  private startQualityMonitoring(): void {
+    this.qualityCheckInterval = setInterval(async () => {
+      await this.checkConnectionQuality();
+    }, 3000);
+  }
+
+  private async checkConnectionQuality(): Promise<void> {
+    try {
+      // This is a simplified quality check - in a real app you'd get actual WebRTC stats
+      const currentState = this.videoCallService.getCurrentCallState();
+      
+      if (!currentState.isInCall) {
+        this.connectionQualityIcon = 'wifi-outline';
+        this.connectionQualityColor = 'medium';
+        this.connectionQualityText = 'Disconnected';
+        return;
+      }
+
+      // Check if both streams are active
+      const hasLocalStream = !!currentState.localStream;
+      const hasRemoteStream = !!currentState.remoteStream;
+      
+      if (hasLocalStream && hasRemoteStream) {
+        // Check video elements are playing
+        const localPlaying = this.localVideo && !this.localVideo.nativeElement.paused;
+        const remotePlaying = this.remoteVideo && !this.remoteVideo.nativeElement.paused;
+        
+        if (localPlaying && remotePlaying) {
+          this.connectionQualityIcon = 'wifi';
+          this.connectionQualityColor = 'success';
+          this.connectionQualityText = 'Excellent';
+        } else {
+          this.connectionQualityIcon = 'wifi';
+          this.connectionQualityColor = 'warning';
+          this.connectionQualityText = 'Good';
+        }
+      } else if (hasLocalStream || hasRemoteStream) {
+        this.connectionQualityIcon = 'wifi-outline';
+        this.connectionQualityColor = 'warning';
+        this.connectionQualityText = 'Poor';
+      } else {
+        this.connectionQualityIcon = 'wifi-outline';
+        this.connectionQualityColor = 'danger';
+        this.connectionQualityText = 'Bad';
+      }
+    } catch (error) {
+      console.error('Error checking connection quality:', error);
+      this.connectionQualityIcon = 'wifi-outline';
+      this.connectionQualityColor = 'medium';
+      this.connectionQualityText = 'Unknown';
+    }
+  }
+
+  async optimizeForNetwork() {
+    console.log('Optimizing for network conditions');
+    
+    const loading = await this.toastController.create({
+      message: 'Optimizing for your network...',
+      duration: 2000,
+      color: 'primary'
+    });
+    await loading.present();
+
+    try {
+      // Get current network information if available
+      const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      
+      let networkType = 'unknown';
+      let effectiveType = '4g';
+      
+      if (connection) {
+        networkType = connection.type || 'unknown';
+        effectiveType = connection.effectiveType || '4g';
+        console.log('Network info:', { type: networkType, effectiveType });
+      }
+
+      // Optimize based on network conditions
+      const currentState = this.videoCallService.getCurrentCallState();
+      
+      if (currentState.localStream) {
+        const videoTrack = currentState.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+          // Apply constraints based on network
+          const constraints = this.getOptimizedConstraints(effectiveType);
+          await videoTrack.applyConstraints(constraints);
+          console.log('Applied optimized constraints:', constraints);
+        }
+      }
+
+      // Show success message
+      const successToast = await this.toastController.create({
+        message: `Optimized for ${effectiveType} network`,
+        duration: 2000,
+        color: 'success'
+      });
+      await successToast.present();
+
+    } catch (error) {
+      console.error('Network optimization failed:', error);
+      
+      const errorToast = await this.toastController.create({
+        message: 'Could not optimize network settings',
+        duration: 2000,
+        color: 'warning'
+      });
+      await errorToast.present();
+    }
+  }
+
+  private getOptimizedConstraints(networkType: string): MediaTrackConstraints {
+    switch (networkType) {
+      case 'slow-2g':
+      case '2g':
+        return {
+          width: { ideal: 320, max: 480 },
+          height: { ideal: 240, max: 360 },
+          frameRate: { ideal: 10, max: 15 }
+        };
+      
+      case '3g':
+        return {
+          width: { ideal: 480, max: 640 },
+          height: { ideal: 360, max: 480 },
+          frameRate: { ideal: 15, max: 20 }
+        };
+      
+      case '4g':
+      default:
+        return {
+          width: { ideal: 640, max: 854 },
+          height: { ideal: 480, max: 640 },
+          frameRate: { ideal: 20, max: 25 }
+        };
     }
   }
 }

@@ -35,6 +35,7 @@ interface Doctor {
   name?: string;
   specialization?: string;
   consultationFee?: number;
+  videoFee?: number;
   rating?: number;
   reviewCount?: number;
   experience?: number;
@@ -199,13 +200,20 @@ export class BookAppointmentPage implements OnInit {
               this.selectedDoctor = {
                 id: doctor.uid,
                 name: doctor.name,
-                specialization: doctor.specialization || 'General Medicine',
-                consultationFee: doctor.consultationFee || 500,
-                rating: doctor.rating || 4.5,
-                reviewCount: doctor.reviewCount || 0,
-                experience: doctor.experience || 5,
+                specialization: doctor.specialization,
+                consultationFee: doctor.consultation?.clinicFee,
+                videoFee: doctor.consultation?.videoFee,
+                rating: doctor.rating,
+                reviewCount: doctor.reviewCount,
+                experience: doctor.experience,
                 avatar: doctor.avatar
               };
+
+              // console.log('Doctor loaded:', this.selectedDoctor);
+              console.log('Raw doctor data from Firebase:', doctor);
+              // console.log('Consultation object:', doctor.consultation);
+              // console.log('Clinic fee:', doctor.consultation?.clinicFee);
+              // console.log('Video fee:', doctor.consultation?.videoFee);
 
               // Subscribe to doctor's schedule
               this.scheduleService.getSchedule(doctorId).subscribe(s => {
@@ -235,33 +243,23 @@ export class BookAppointmentPage implements OnInit {
                 }
               });
             } else {
-              // Fallback to mock data if doctor not found
-              this.setMockDoctorData(doctorId);
+              console.error('Doctor not found or not a doctor role');
+              // Don't set mock data, let the user know the doctor wasn't found
             }
           },
           error: (error) => {
             console.error('Error loading doctor details:', error);
-            this.setMockDoctorData(doctorId);
+            // Don't use mock data, let the error be handled properly
           }
         });
       } catch (error) {
         console.error('Error loading doctor details:', error);
-        this.setMockDoctorData(doctorId);
+        // Don't use mock data, let the error be handled properly
       }
     }
   }
 
-  private setMockDoctorData(doctorId: string) {
-    this.selectedDoctor = {
-      id: doctorId,
-      name: 'Dr. Sarah Johnson',
-      specialization: 'Cardiologist',
-      consultationFee: 500,
-      rating: 4.8,
-      reviewCount: 156,
-      experience: 10
-    };
-  }
+
 
   generateAvailableDates() {
     const dates = [];
@@ -570,9 +568,9 @@ export class BookAppointmentPage implements OnInit {
 
     const appointmentType = this.bookingForm?.get('appointmentType')?.value;
     if (appointmentType === 'video') {
-      return 0; // Free video consultation
+      return this.selectedDoctor.videoFee || 0;
     }
-    return this.selectedDoctor.consultationFee || 500;
+    return this.selectedDoctor.consultationFee || 0;
   }
 
   // Handle doctor image loading error

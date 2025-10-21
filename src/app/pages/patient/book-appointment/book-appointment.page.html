@@ -177,7 +177,7 @@
               <ion-label>
                 <h3>Clinic Visit</h3>
                 <p>In-person consultation at clinic</p>
-                <p class="fee">Fee: ₹{{ selectedDoctor?.consultationFee || '500' }}</p>
+                <p class="fee">Fee: ₹{{ selectedDoctor?.consultationFee }}</p>
               </ion-label>
             </ion-item>
             
@@ -186,7 +186,7 @@
               <ion-label>
                 <h3>Video Consultation</h3>
                 <p>Online video call consultation</p>
-                <p class="fee free">Fee: FREE</p>
+                <p class="fee free">Fee: ₹{{ selectedDoctor?.videoFee  }}</p>
               </ion-label>
             </ion-item>
           </ion-radio-group>

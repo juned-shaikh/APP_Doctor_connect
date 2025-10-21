@@ -89,6 +89,7 @@ export interface UserData {
   qualification?: string;
   experience?: number; // total years
   consultationFee?: number;
+  videoFee?:number;
   clinicAddress?: string; // legacy flat address
   isVerified?: boolean;
   kycStatus?: 'pending' | 'approved' | 'rejected';
@@ -1331,6 +1332,30 @@ async updateUserProfile(uid: string, data: Partial<UserData>) {
       endedAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     });
+  }
+
+  async clearCallData(callId: string): Promise<void> {
+    try {
+      const callRef = doc(this.firestore, 'videoCalls', callId);
+      
+      // Clear offer and answer for renegotiation
+      await updateDoc(callRef, {
+        offer: null,
+        answer: null,
+        updatedAt: Timestamp.now()
+      });
+
+      // Clear ICE candidates
+      const candidatesRef = collection(this.firestore, 'videoCalls', callId, 'iceCandidates');
+      const candidatesSnapshot = await getDocs(candidatesRef);
+      const deletePromises = candidatesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+
+      console.log('Call data cleared successfully for renegotiation');
+    } catch (error) {
+      console.error('Error clearing call data:', error);
+      throw error;
+    }
   }
 
   getVideoCall(callId: string): Observable<any> {

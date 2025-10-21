@@ -10,21 +10,30 @@
 </ion-header>
 
 <ion-content [fullscreen]="true" class="video-call-content">
-  <!-- Connection Status -->
-  <div class="status-bar" [class.connected]="callState.isInCall && callState.remoteStream">
+  <!-- Enhanced Connection Status -->
+  <div class="status-bar" [class.connected]="callState.isInCall && callState.remoteStream"
+    [class.connecting]="callState.isConnecting" [class.error]="callState.error">
     <ion-text>
       <p>{{ connectionStatus }}</p>
       <small *ngIf="participantName">{{ isDoctor ? 'Patient' : 'Doctor' }}: {{ participantName }}</small>
+      <small *ngIf="callDuration && callState.isInCall" class="call-duration">{{ callDuration }}</small>
     </ion-text>
+
+    <!-- Connection Quality Indicator -->
+    <div class="connection-quality" *ngIf="callState.isInCall">
+      <ion-icon [name]="connectionQualityIcon" [color]="connectionQualityColor"></ion-icon>
+      <small>{{ connectionQualityText }}</small>
+    </div>
   </div>
 
   <!-- Video Container -->
   <div class="video-container">
     <!-- Remote Video (Main) -->
     <div class="remote-video-container">
-      <video #remoteVideo autoplay playsinline muted="false" controls="false" [class.hidden]="!callState.remoteStream"
-        class="remote-video">
-      </video>
+      <video #remoteVideo autoplay playsinline muted="false" controls="false"
+        controlslist="nodownload nofullscreen noremoteplayback" disablepictureinpicture
+        [class.hidden]="!callState.remoteStream" class="remote-video" (contextmenu)="$event.preventDefault()"
+        (dblclick)="$event.preventDefault()"></video>
 
       <!-- Placeholder when no remote stream -->
       <div class="video-placeholder" *ngIf="!callState.remoteStream">
@@ -37,9 +46,10 @@
 
     <!-- Local Video (Picture-in-Picture) -->
     <div class="local-video-container" *ngIf="callState.localStream">
-      <video #localVideo autoplay playsinline muted="true" controls="false" class="local-video"
-        [class.video-off]="!isVideoEnabled">
-      </video>
+      <video #localVideo autoplay playsinline muted="true" controls="false"
+        controlslist="nodownload nofullscreen noremoteplayback" disablepictureinpicture class="local-video"
+        [class.video-off]="!isVideoEnabled" (contextmenu)="$event.preventDefault()"
+        (dblclick)="$event.preventDefault()"></video>
 
       <!-- Video off indicator -->
       <div class="video-off-indicator" *ngIf="!isVideoEnabled">
@@ -118,6 +128,41 @@
             <ion-icon name="refresh" slot="start"></ion-icon>
             Refresh Video
           </ion-button>
+        </div>
+
+        <!-- Additional troubleshooting for when in call but video not working -->
+        <div *ngIf="callState.isInCall && callState.localStream && !callState.remoteStream" class="video-troubleshoot">
+          <ion-text color="warning">
+            <small>Can't see the other person's video? Try these options:</small>
+          </ion-text>
+          <div class="troubleshoot-buttons">
+            <ion-button fill="clear" size="small" (click)="forceRefreshVideo()">
+              <ion-icon name="refresh" slot="start"></ion-icon>
+              Refresh Video
+            </ion-button>
+            <ion-button fill="clear" size="small" (click)="rejoinCall()">
+              <ion-icon name="enter" slot="start"></ion-icon>
+              Rejoin Call
+            </ion-button>
+          </div>
+        </div>
+
+        <!-- Video quality troubleshooting -->
+        <div *ngIf="callState.isInCall && (callState.localStream || callState.remoteStream)"
+          class="quality-troubleshoot">
+          <ion-text color="medium">
+            <small>Video quality issues? Colorful blocks or artifacts?</small>
+          </ion-text>
+          <div class="troubleshoot-buttons">
+            <ion-button fill="clear" size="small" (click)="fixVideoQuality()">
+              <ion-icon name="construct" slot="start"></ion-icon>
+              Fix Video Quality
+            </ion-button>
+            <ion-button fill="clear" size="small" (click)="optimizeForNetwork()">
+              <ion-icon name="speedometer" slot="start"></ion-icon>
+              Optimize Network
+            </ion-button>
+          </div>
         </div>
 
         <!-- Doctor can mark as present even without rejoining -->

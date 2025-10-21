@@ -28,20 +28,25 @@ export class VideoCallService {
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' }
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // Add more STUN servers for better connectivity
+        { urls: 'stun:stun.services.mozilla.com' },
+        { urls: 'stun:stun.stunprotocol.org:3478' }
       ],
-      iceCandidatePoolSize: isMobile ? 5 : 10,
+      iceCandidatePoolSize: isMobile ? 8 : 15,
       bundlePolicy: 'max-bundle' as RTCBundlePolicy,
-      rtcpMuxPolicy: 'require' as RTCRtcpMuxPolicy
+      rtcpMuxPolicy: 'require' as RTCRtcpMuxPolicy,
+      sdpSemantics: 'unified-plan' as any,
+      // Enhanced connection settings
+      iceTransportPolicy: 'all' as RTCIceTransportPolicy
     };
 
     // Mobile-specific optimizations
     if (isMobile) {
       return {
         ...baseConfig,
-        iceTransportPolicy: 'all' as RTCIceTransportPolicy,
-        // Add more aggressive ICE gathering for mobile
-        iceCandidatePoolSize: 3
+        iceCandidatePoolSize: 8
       };
     }
 
@@ -49,6 +54,32 @@ export class VideoCallService {
   }
 
   constructor(private firebaseService: FirebaseService) { }
+
+  private async configureVideoSender(sender: RTCRtpSender, isMobile: boolean): Promise<void> {
+    try {
+      const params = sender.getParameters();
+      
+      if (!params.encodings || params.encodings.length === 0) {
+        params.encodings = [{}];
+      }
+
+      // Configure encoding parameters to prevent video artifacts
+      params.encodings[0] = {
+        ...params.encodings[0],
+        maxBitrate: isMobile ? 400000 : 800000, // Improved bitrate
+        maxFramerate: isMobile ? 20 : 25, // Better framerate
+        scaleResolutionDownBy: isMobile ? 1.5 : 1, // Less aggressive scaling
+        // Enhanced quality settings
+        priority: 'high' as RTCPriorityType,
+        networkPriority: 'high' as RTCPriorityType
+      };
+
+      await sender.setParameters(params);
+      console.log('Video sender configured with encoding parameters:', params.encodings[0]);
+    } catch (error) {
+      console.error('Error configuring video sender:', error);
+    }
+  }
 
 
 
@@ -98,32 +129,55 @@ export class VideoCallService {
         throw new Error('Video calls require a secure connection (HTTPS). Please access the app via HTTPS.');
       }
 
-      // Get user media with mobile-optimized constraints
+      // Get user media with optimized constraints to prevent video artifacts
       try {
         const constraints = isMobile ? {
           video: {
-            width: { ideal: 480, max: 640 },
-            height: { ideal: 640, max: 480 },
-            frameRate: { ideal: 15, max: 24 },
-            facingMode: 'user'
+            width: { ideal: 640, max: 854 },
+            height: { ideal: 480, max: 640 },
+            frameRate: { ideal: 20, max: 25 },
+            facingMode: 'user',
+            // Enhanced video quality settings
+            aspectRatio: { ideal: 4/3 },
+            resizeMode: 'crop-and-scale' as any,
+            // Better quality settings
+            whiteBalanceMode: 'auto' as any,
+            exposureMode: 'auto' as any,
+            focusMode: 'auto' as any
           },
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
-            sampleRate: 44100
+            sampleRate: 48000, // Higher quality audio
+            channelCount: 1,
+            // Enhanced audio settings
+            latency: 0.01,
+            volume: 1.0
           }
         } : {
           video: {
-            width: { ideal: 640, max: 1280 },
-            height: { ideal: 480, max: 720 },
-            frameRate: { ideal: 15, max: 30 },
-            facingMode: 'user'
+            width: { ideal: 854, max: 1280 },
+            height: { ideal: 640, max: 720 },
+            frameRate: { ideal: 25, max: 30 },
+            facingMode: 'user',
+            // Enhanced video quality settings
+            aspectRatio: { ideal: 4/3 },
+            resizeMode: 'crop-and-scale' as any,
+            // Better quality settings
+            whiteBalanceMode: 'auto' as any,
+            exposureMode: 'auto' as any,
+            focusMode: 'auto' as any
           },
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: true
+            autoGainControl: true,
+            sampleRate: 48000, // Higher quality audio
+            channelCount: 1,
+            // Enhanced audio settings
+            latency: 0.01,
+            volume: 1.0
           }
         };
 
@@ -185,10 +239,15 @@ export class VideoCallService {
       this.peerConnection = new RTCPeerConnection(config);
       console.log('Created peer connection for mobile:', isMobile);
 
-      // Add local stream to peer connection
+      // Add local stream to peer connection with quality settings
       this.localStream.getTracks().forEach(track => {
         if (this.peerConnection && this.localStream) {
-          this.peerConnection.addTrack(track, this.localStream);
+          const sender = this.peerConnection.addTrack(track, this.localStream);
+          
+          // Apply encoding parameters to prevent video artifacts
+          if (track.kind === 'video') {
+            this.configureVideoSender(sender, isMobile);
+          }
         }
       });
 
@@ -281,7 +340,7 @@ export class VideoCallService {
 
       this.updateCallState({
         isInCall: true,
-        localStream: this.localStream
+        localStream: this.localStream || undefined
       });
 
     } catch (error) {
@@ -491,6 +550,10 @@ export class VideoCallService {
     this.peerConnection.ontrack = (event) => {
       console.log('Received remote stream:', event.streams[0]);
       const remoteStream = event.streams[0];
+      
+      // Add quality monitoring for remote stream
+      this.monitorStreamQuality(remoteStream, 'remote');
+      
       this.updateCallState({ remoteStream, isConnecting: false });
     };
 
@@ -507,8 +570,18 @@ export class VideoCallService {
       console.log('Connection state:', this.peerConnection?.connectionState);
       if (this.peerConnection?.connectionState === 'connected') {
         this.updateCallState({ isConnecting: false });
+        
+        // Monitor video quality once connected
+        this.monitorVideoQuality();
+        
+        // Optimize connection after successful connection
+        this.optimizeConnection();
       } else if (this.peerConnection?.connectionState === 'failed') {
         console.error('Peer connection failed');
+        this.handleConnectionFailure(callId);
+      } else if (this.peerConnection?.connectionState === 'disconnected') {
+        console.warn('Peer connection disconnected, attempting reconnection');
+        this.attemptReconnection(callId);
       }
     };
 
@@ -516,6 +589,184 @@ export class VideoCallService {
     this.peerConnection.oniceconnectionstatechange = () => {
       console.log('ICE connection state changed:', this.peerConnection?.iceConnectionState);
     };
+  }
+
+  private monitorStreamQuality(stream: MediaStream, type: 'local' | 'remote'): void {
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    console.log(`Monitoring ${type} stream quality:`, {
+      enabled: videoTrack.enabled,
+      readyState: videoTrack.readyState,
+      settings: videoTrack.getSettings(),
+      constraints: videoTrack.getConstraints()
+    });
+
+    // Monitor track state changes
+    videoTrack.onended = () => {
+      console.warn(`${type} video track ended unexpectedly`);
+    };
+
+    videoTrack.onmute = () => {
+      console.warn(`${type} video track muted`);
+    };
+
+    videoTrack.onunmute = () => {
+      console.log(`${type} video track unmuted`);
+    };
+  }
+
+  private monitorVideoQuality(): void {
+    if (!this.peerConnection) return;
+
+    // Monitor video quality every 5 seconds
+    const qualityInterval = setInterval(async () => {
+      if (!this.peerConnection || this.peerConnection.connectionState !== 'connected') {
+        clearInterval(qualityInterval);
+        return;
+      }
+
+      try {
+        const stats = await this.peerConnection.getStats();
+        stats.forEach((report) => {
+          if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+            console.log('Inbound video stats:', {
+              framesDecoded: report.framesDecoded,
+              framesDropped: report.framesDropped,
+              frameWidth: report.frameWidth,
+              frameHeight: report.frameHeight,
+              bytesReceived: report.bytesReceived
+            });
+
+            // Check for video quality issues
+            if (report.framesDropped > 0) {
+              console.warn('Video frames being dropped, possible quality issues');
+            }
+          }
+
+          if (report.type === 'outbound-rtp' && report.mediaType === 'video') {
+            console.log('Outbound video stats:', {
+              framesEncoded: report.framesEncoded,
+              frameWidth: report.frameWidth,
+              frameHeight: report.frameHeight,
+              bytesSent: report.bytesSent
+            });
+          }
+        });
+      } catch (error) {
+        console.error('Error getting video quality stats:', error);
+      }
+    }, 5000);
+
+    // Clean up interval after 60 seconds
+    setTimeout(() => {
+      clearInterval(qualityInterval);
+    }, 60000);
+  }
+
+  private async optimizeConnection(): Promise<void> {
+    if (!this.peerConnection) return;
+
+    try {
+      console.log('Optimizing connection...');
+      
+      // Get connection stats
+      const stats = await this.peerConnection.getStats();
+      
+      stats.forEach((report) => {
+        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+          console.log('Active connection pair:', {
+            localCandidateType: report.localCandidateType,
+            remoteCandidateType: report.remoteCandidateType,
+            currentRoundTripTime: report.currentRoundTripTime,
+            availableOutgoingBitrate: report.availableOutgoingBitrate
+          });
+        }
+      });
+
+      // Optimize video senders based on connection quality
+      const senders = this.peerConnection.getSenders();
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+          await this.optimizeVideoSender(sender);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error optimizing connection:', error);
+    }
+  }
+
+  private async optimizeVideoSender(sender: RTCRtpSender): Promise<void> {
+    try {
+      const stats = await sender.getStats();
+      let shouldOptimize = false;
+      let currentBitrate = 0;
+
+      stats.forEach((report) => {
+        if (report.type === 'outbound-rtp' && report.mediaType === 'video') {
+          currentBitrate = report.bytesSent * 8 / (report.timestamp / 1000);
+          
+          // Check if we need to optimize based on quality metrics
+          if (report.framesDropped > 0 || report.qualityLimitationReason === 'bandwidth') {
+            shouldOptimize = true;
+          }
+        }
+      });
+
+      if (shouldOptimize) {
+        console.log('Optimizing video sender due to quality issues');
+        const params = sender.getParameters();
+        
+        if (params.encodings && params.encodings[0]) {
+          // Reduce bitrate if there are issues
+          params.encodings[0].maxBitrate = Math.max(200000, (params.encodings[0].maxBitrate || 500000) * 0.8);
+          await sender.setParameters(params);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error optimizing video sender:', error);
+    }
+  }
+
+  private async handleConnectionFailure(callId: string): Promise<void> {
+    console.log('Handling connection failure...');
+    
+    // Update state to show connection failed
+    this.updateCallState({ 
+      error: 'Connection failed. Attempting to reconnect...',
+      isConnecting: true 
+    });
+
+    // Wait a bit before attempting recovery
+    setTimeout(async () => {
+      try {
+        await this.recoverPeerConnection(callId, true);
+      } catch (error) {
+        console.error('Connection recovery failed:', error);
+        this.updateCallState({ 
+          error: 'Connection could not be restored. Please try rejoining the call.',
+          isConnecting: false 
+        });
+      }
+    }, 2000);
+  }
+
+  private async attemptReconnection(callId: string): Promise<void> {
+    console.log('Attempting reconnection...');
+    
+    // Try to restart ICE
+    if (this.peerConnection) {
+      try {
+        this.peerConnection.restartIce();
+        console.log('ICE restart initiated');
+      } catch (error) {
+        console.error('ICE restart failed:', error);
+        // Fallback to full reconnection
+        this.handleConnectionFailure(callId);
+      }
+    }
   }
 
   private async cleanupConnection(): Promise<void> {
@@ -599,6 +850,51 @@ export class VideoCallService {
     const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
     console.log('Rejoining on mobile:', isMobile);
 
+    // Check if there's already an active call with streams
+    const currentState = this.getCurrentCallState();
+    const hasExistingStreams = currentState.localStream || currentState.remoteStream;
+    
+    console.log('Existing streams during rejoin:', {
+      hasLocal: !!currentState.localStream,
+      hasRemote: !!currentState.remoteStream,
+      isInCall: currentState.isInCall
+    });
+
+    // If we have existing streams and connection, try to reuse them first
+    if (hasExistingStreams && this.peerConnection) {
+      console.log('Attempting to reuse existing connection for rejoin');
+      
+      // Update state to show we're rejoining
+      this.updateCallState({ 
+        isConnecting: true, 
+        callId,
+        error: undefined 
+      });
+
+      try {
+        // Check peer connection state
+        console.log('Peer connection state:', this.peerConnection.connectionState);
+        console.log('ICE connection state:', this.peerConnection.iceConnectionState);
+        
+        // If connection is still good, just update the state
+        if (this.peerConnection.connectionState === 'connected' || 
+            this.peerConnection.iceConnectionState === 'connected') {
+          console.log('Reusing existing good connection');
+          
+          this.updateCallState({
+            isInCall: true,
+            isConnecting: false,
+            localStream: this.localStream || undefined,
+            remoteStream: currentState.remoteStream
+          });
+          
+          return; // Successfully rejoined with existing connection
+        }
+      } catch (error) {
+        console.log('Error checking existing connection, will create new one:', error);
+      }
+    }
+
     // Force cleanup of any existing state
     await this.cleanupConnection();
 
@@ -610,72 +906,87 @@ export class VideoCallService {
     console.log('Waiting for cleanup to complete:', cleanupDelay + 'ms');
     await new Promise(resolve => setTimeout(resolve, cleanupDelay));
 
-    // For mobile rejoining, we need to ensure Firebase call data is completely cleared
-    if (isMobile) {
-      console.log('Mobile rejoin: clearing Firebase call data');
-      try {
-        await this.firebaseService.endCall(callId);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.log('Error clearing Firebase data:', error);
-      }
+    // For rejoining, we need to ensure Firebase call data is properly managed
+    console.log('Rejoin: managing Firebase call data');
+    try {
+      // Don't end the call completely, just clear signaling data for renegotiation
+      await this.firebaseService.clearCallData(callId);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.log('Error managing Firebase data during rejoin:', error);
     }
 
     // Initialize the call fresh
     try {
       await this.initializeCall(callId, isInitiator);
 
-      // For mobile, add additional verification after initialization
-      if (isMobile) {
-        setTimeout(() => {
-          this.verifyMobileConnection(callId, isInitiator);
-        }, 5000);
-      }
+      // Add additional verification after initialization
+      setTimeout(() => {
+        this.verifyRejoinConnection(callId, isInitiator);
+      }, 3000);
+      
     } catch (error) {
       console.error('Error during rejoin initialization:', error);
 
-      // Mobile fallback: try one more time with different approach
-      if (isMobile) {
-        console.log('Mobile rejoin failed, trying fallback approach');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await this.mobileRejoinFallback(callId, isInitiator);
-      } else {
-        throw error;
-      }
+      // Fallback: try one more time with different approach
+      console.log('Rejoin failed, trying fallback approach');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await this.rejoinFallback(callId, isInitiator);
     }
   }
 
-  private async verifyMobileConnection(callId: string, isInitiator: boolean): Promise<void> {
-    console.log('Verifying mobile connection...');
+  private async verifyRejoinConnection(callId: string, isInitiator: boolean): Promise<void> {
+    console.log('Verifying rejoin connection...');
 
     const currentState = this.getCurrentCallState();
     const hasLocalStream = !!currentState.localStream;
     const hasRemoteStream = !!currentState.remoteStream;
 
-    console.log('Mobile connection check - Local:', hasLocalStream, 'Remote:', hasRemoteStream);
+    console.log('Rejoin connection check - Local:', hasLocalStream, 'Remote:', hasRemoteStream);
+    console.log('Peer connection state:', this.peerConnection?.connectionState);
+    console.log('ICE connection state:', this.peerConnection?.iceConnectionState);
 
-    // If we don't have remote stream after 5 seconds on mobile, try to renegotiate
+    // If we don't have remote stream after a few seconds, try to renegotiate
     if (hasLocalStream && !hasRemoteStream && this.peerConnection) {
-      console.log('Mobile: Missing remote stream, attempting renegotiation');
+      console.log('Missing remote stream during rejoin, attempting renegotiation');
 
       if (isInitiator) {
         try {
+          // Clear and recreate offer
+          await this.firebaseService.clearCallData(callId);
+          await new Promise(resolve => setTimeout(resolve, 500));
           await this.createOffer(callId);
         } catch (error) {
-          console.error('Mobile renegotiation failed:', error);
+          console.error('Rejoin renegotiation failed:', error);
         }
       }
     }
+
+    // If peer connection is in failed state, try to recover
+    if (this.peerConnection && 
+        (this.peerConnection.connectionState === 'failed' || 
+         this.peerConnection.iceConnectionState === 'failed')) {
+      console.log('Peer connection failed during rejoin, attempting recovery');
+      await this.recoverPeerConnection(callId, isInitiator);
+    }
   }
 
-  private async mobileRejoinFallback(callId: string, isInitiator: boolean): Promise<void> {
-    console.log('Attempting mobile rejoin fallback');
+  private async rejoinFallback(callId: string, isInitiator: boolean): Promise<void> {
+    console.log('Attempting rejoin fallback');
 
-    // Complete reset for mobile
+    // Complete reset
     await this.cleanupConnection();
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Try with more conservative settings
+    // Clear all Firebase data and start fresh
+    try {
+      await this.firebaseService.clearCallData(callId);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      console.log('Error clearing data in fallback:', error);
+    }
+
+    // Try with fresh initialization
     await this.initializeCall(callId, isInitiator);
   }
 
@@ -693,6 +1004,32 @@ export class VideoCallService {
     } catch (error) {
       console.error('Error enumerating devices:', error);
       return { hasCamera: false, hasMicrophone: false, devices: [] };
+    }
+  }
+
+  // Method to create a new offer for renegotiation
+  async createNewOffer(callId: string): Promise<void> {
+    if (!this.peerConnection) {
+      console.error('No peer connection available for renegotiation');
+      return;
+    }
+
+    try {
+      console.log('Creating new offer for renegotiation');
+      
+      // Clear existing offer/answer in Firebase
+      await this.firebaseService.clearCallData(callId);
+      
+      // Wait a moment for cleanup
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Create new offer
+      await this.createOffer(callId);
+      
+      console.log('New offer created successfully');
+    } catch (error) {
+      console.error('Error creating new offer:', error);
+      throw error;
     }
   }
 
@@ -728,7 +1065,7 @@ export class VideoCallService {
         });
       }
 
-      this.updateCallState({ localStream: this.localStream });
+      this.updateCallState({ localStream: this.localStream || undefined });
     } catch (error) {
       console.error('Error resuming call:', error);
       this.updateCallState({ error: 'Failed to resume video call' });
