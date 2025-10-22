@@ -35,6 +35,9 @@ interface Doctor {
   name?: string;
   specialization?: string;
   consultationFee?: number;
+  videoConsultationFee?: number;
+  videoConsultationEnabled?: boolean;
+  videoConsultationAccess?: boolean; // Set by super admin
   rating?: number;
   reviewCount?: number;
   experience?: number;
@@ -173,8 +176,8 @@ export class BookAppointmentPage implements OnInit {
   initializeForm() {
     this.bookingForm = this.fb.group({
       patientName: ['', [Validators.required, Validators.minLength(2)]],
-      age: ['', [Validators.required, Validators.min(1), Validators.max(120)]],
-      phone: ['', [Validators.required, Validators.pattern(/^[0-9]{10,15}$/)]],
+      age: ['', [Validators.required, Validators.min(1), Validators.max(120), Validators.pattern(/^[0-9]{1,3}$/)]],
+      phone: ['', [Validators.required, Validators.pattern(/^[0-9]{10,15}$/), Validators.minLength(10)]],
       appointmentType: ['clinic', Validators.required],
       // Keep paymentMethod but default to 'cash'
       paymentMethod: ['cash', Validators.required]
@@ -185,6 +188,16 @@ export class BookAppointmentPage implements OnInit {
       console.log('Form values changed:', values);
       console.log('Form valid:', this.bookingForm.valid);
     });
+  }
+
+  // Update appointment type when doctor data is loaded
+  private updateAppointmentTypeOptions() {
+    if (this.bookingForm && this.selectedDoctor) {
+      // If video consultation is not available, ensure clinic is selected
+      if (!this.isVideoConsultationAvailable()) {
+        this.bookingForm.patchValue({ appointmentType: 'clinic' });
+      }
+    }
   }
 
   async loadDoctorDetails() {
@@ -201,11 +214,17 @@ export class BookAppointmentPage implements OnInit {
                 name: doctor.name,
                 specialization: doctor.specialization || 'General Medicine',
                 consultationFee: doctor.consultationFee || 500,
+                videoConsultationFee: doctor.consultation?.videoFee || 0,
+                videoConsultationEnabled: doctor.consultation?.videoEnabled || false,
+                videoConsultationAccess: doctor.videoConsultationAccess || false,
                 rating: doctor.rating || 4.5,
                 reviewCount: doctor.reviewCount || 0,
                 experience: doctor.experience || 5,
                 avatar: doctor.avatar
               };
+
+              // Update appointment type options based on doctor's video consultation availability
+              this.updateAppointmentTypeOptions();
 
               // Subscribe to doctor's schedule
               this.scheduleService.getSchedule(doctorId).subscribe(s => {
@@ -257,10 +276,16 @@ export class BookAppointmentPage implements OnInit {
       name: 'Dr. Sarah Johnson',
       specialization: 'Cardiologist',
       consultationFee: 500,
+      videoConsultationFee: 300,
+      videoConsultationEnabled: true,
+      videoConsultationAccess: true, // Mock data has video access enabled
       rating: 4.8,
       reviewCount: 156,
       experience: 10
     };
+    
+    // Update appointment type options for mock data
+    this.updateAppointmentTypeOptions();
   }
 
   generateAvailableDates() {
@@ -570,7 +595,7 @@ export class BookAppointmentPage implements OnInit {
 
     const appointmentType = this.bookingForm?.get('appointmentType')?.value;
     if (appointmentType === 'video') {
-      return 0; // Free video consultation
+      return this.selectedDoctor.videoConsultationFee || 0;
     }
     return this.selectedDoctor.consultationFee || 500;
   }
@@ -579,6 +604,66 @@ export class BookAppointmentPage implements OnInit {
   onDoctorImageError() {
     if (this.selectedDoctor) {
       this.selectedDoctor.avatar = undefined;
+    }
+  }
+
+  // Check if video consultation is available for this doctor
+  isVideoConsultationAvailable(): boolean {
+    return !!(this.selectedDoctor?.videoConsultationAccess && this.selectedDoctor?.videoConsultationEnabled);
+  }
+
+  // Number-only input validation methods
+  onNumberKeyPress(event: any): boolean {
+    const charCode = event.which ? event.which : event.keyCode;
+    // Allow: backspace, delete, tab, escape, enter
+    if ([8, 9, 27, 13, 46].indexOf(charCode) !== -1 ||
+        // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+        (charCode === 65 && event.ctrlKey === true) ||
+        (charCode === 67 && event.ctrlKey === true) ||
+        (charCode === 86 && event.ctrlKey === true) ||
+        (charCode === 88 && event.ctrlKey === true)) {
+      return true;
+    }
+    // Ensure that it is a number and stop the keypress
+    if (charCode < 48 || charCode > 57) {
+      event.preventDefault();
+      return false;
+    }
+    return true;
+  }
+
+  onAgeInput(event: any) {
+    const value = event.target.value;
+    // Remove any non-numeric characters
+    const numericValue = value.replace(/[^0-9]/g, '');
+    
+    // Limit to 3 digits maximum
+    const limitedValue = numericValue.substring(0, 3);
+    
+    // Limit to reasonable age range
+    let age = parseInt(limitedValue);
+    if (age > 120) {
+      age = 120;
+    }
+    
+    // Update the form control with cleaned value
+    const finalValue = age ? age.toString() : limitedValue;
+    if (finalValue !== value) {
+      this.bookingForm.patchValue({ age: finalValue });
+    }
+  }
+
+  onPhoneInput(event: any) {
+    const value = event.target.value;
+    // Remove any non-numeric characters
+    const numericValue = value.replace(/[^0-9]/g, '');
+    
+    // Limit to 15 digits (international phone number standard)
+    const limitedValue = numericValue.substring(0, 15);
+    
+    // Update the form control with cleaned value
+    if (limitedValue !== value) {
+      this.bookingForm.patchValue({ phone: limitedValue });
     }
   }
 }

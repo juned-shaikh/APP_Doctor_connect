@@ -120,6 +120,9 @@ export interface UserData {
     paymentMethods?: ('online' | 'cash')[];
   };
   
+  // Super admin controlled video consultation access
+  videoConsultationAccess?: boolean;
+  
   // Patient specific fields
   age?: number;
   gender?: string;
@@ -1141,6 +1144,18 @@ async updateUserProfile(uid: string, data: Partial<UserData>) {
       });
     } catch (error) {
       console.error('Error toggling user status:', error);
+      throw error;
+    }
+  }
+
+  async updateVideoConsultationAccess(userId: string, hasAccess: boolean): Promise<void> {
+    try {
+      await updateDoc(doc(this.firestore, 'users', userId), {
+        videoConsultationAccess: hasAccess,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error updating video consultation access:', error);
       throw error;
     }
   }

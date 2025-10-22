@@ -12,7 +12,9 @@ import { FirebaseService, UserData } from '../../../services/firebase.service';
 import { addIcons } from 'ionicons';
 import { 
   personOutline, medicalOutline, shieldCheckmarkOutline, searchOutline,
-  toggleOutline, trashOutline, createOutline, eyeOutline, filterOutline
+  toggleOutline, trashOutline, createOutline, eyeOutline, filterOutline,
+  videocamOutline, mailOutline, callOutline, schoolOutline, checkmarkCircleOutline,
+  calendarOutline, pauseOutline, playOutline, peopleOutline
 } from 'ionicons/icons';
 
 @Component({
@@ -43,7 +45,9 @@ export class UserManagementPage implements OnInit {
   ) {
     addIcons({
       personOutline, medicalOutline, shieldCheckmarkOutline, searchOutline,
-      toggleOutline, trashOutline, createOutline, eyeOutline, filterOutline
+      toggleOutline, trashOutline, createOutline, eyeOutline, filterOutline,
+      videocamOutline, mailOutline, callOutline, schoolOutline, checkmarkCircleOutline,
+      calendarOutline, pauseOutline, playOutline, peopleOutline
     });
   }
 
@@ -146,6 +150,46 @@ export class UserManagementPage implements OnInit {
 
   getStatusColor(isActive: boolean): string {
     return isActive ? 'success' : 'danger';
+  }
+
+  async toggleVideoConsultationAccess(user: UserData, event: any) {
+    const isEnabled = event.detail.checked;
+    
+    const alert = await this.alertController.create({
+      header: `${isEnabled ? 'Enable' : 'Disable'} Video Consultation Access`,
+      message: `Are you sure you want to ${isEnabled ? 'enable' : 'disable'} video consultation access for Dr. ${user.name}?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          handler: () => {
+            // Reset toggle to previous state
+            event.target.checked = !isEnabled;
+          }
+        },
+        {
+          text: isEnabled ? 'Enable' : 'Disable',
+          handler: async () => {
+            try {
+              await this.firebaseService.updateVideoConsultationAccess(user.uid, isEnabled);
+              user.videoConsultationAccess = isEnabled;
+              
+              this.showToast(
+                `Video consultation access ${isEnabled ? 'enabled' : 'disabled'} for Dr. ${user.name}`,
+                'success'
+              );
+            } catch (error) {
+              console.error('Error updating video consultation access:', error);
+              this.showToast('Error updating video consultation access', 'danger');
+              // Reset toggle to previous state
+              event.target.checked = !isEnabled;
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 
   async showToast(message: string, color: 'success' | 'danger' | 'warning' = 'success') {

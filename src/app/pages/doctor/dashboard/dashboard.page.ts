@@ -26,9 +26,9 @@ import { AuthService, User } from 'src/app/services/auth.service';
       <ion-toolbar>
         <ion-title>Doctor Dashboard</ion-title>
         <ion-buttons slot="end">
-          <ion-button fill="clear" (click)="viewNotifications()">
+          <ion-button fill="clear" (click)="viewPendingAppointments()">
             <ion-icon name="notifications-outline"></ion-icon>
-            <ion-badge *ngIf="notificationCount > 0" color="danger">{{ notificationCount }}</ion-badge>
+            <ion-badge *ngIf="pendingAppointmentsCount > 0" color="danger">{{ pendingAppointmentsCount }}</ion-badge>
           </ion-button>
           <ion-button fill="clear" (click)="showUserMenu()">
             <ion-icon name="ellipsis-vertical-outline"></ion-icon>
@@ -448,6 +448,17 @@ import { AuthService, User } from 'src/app/services/auth.service';
       margin: 0;
       opacity: 0.8;
     }
+    /* Notification badge styling */
+    ion-button ion-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      min-width: 18px;
+      height: 18px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
     @media (max-width: 768px) {
       .doctor-info {
         flex-direction: column;
@@ -492,7 +503,7 @@ export class DoctorDashboardPage implements OnInit, OnDestroy {
   totalConsultations = 234; // TODO: wire to real metric if desired
   rating = 4.8;
   reviewCount = 89;
-  notificationCount = 3;
+  pendingAppointmentsCount = 0;
 doctorProfile: User | null = null;
   upcomingAppointments: { id: string; patientName: string; time: string; type: string; status: string }[] = [];
 
@@ -554,6 +565,10 @@ doctorProfile: User | null = null;
       this.apptSub = this.firebaseService.getAppointmentsByDoctor(uid).subscribe((appointments: AppointmentData[]) => {
         const today = new Date();
         const todays = appointments.filter(a => new Date(a.date).toDateString() === today.toDateString());
+        
+        // Count pending appointments for notification badge
+        this.pendingAppointmentsCount = appointments.filter(a => a.status.toLowerCase() === 'pending').length;
+        
         // Map to UI model expected by template
         this.upcomingAppointments = todays.map(a => ({
           id: a.id!,
@@ -658,9 +673,11 @@ getDoctorSpecialization(): string {
     }
   }
 
-  viewNotifications() {
-    // Navigate to notifications page
-    console.log('View notifications');
+  viewPendingAppointments() {
+    // Navigate to bookings page with pending tab selected
+    this.router.navigate(['/doctor/bookings'], { 
+      queryParams: { filter: 'pending' } 
+    });
   }
 
   viewAppointments() {

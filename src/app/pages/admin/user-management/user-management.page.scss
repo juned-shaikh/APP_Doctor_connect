@@ -89,6 +89,34 @@
   color: var(--ion-color-dark);
 }
 
+.video-consultation-control {
+  background-color: var(--ion-color-light-tint);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-left: 4px solid var(--ion-color-tertiary);
+  
+  ion-icon {
+    color: var(--ion-color-tertiary) !important;
+    font-size: 1.2rem !important;
+  }
+  
+  h3 {
+    color: var(--ion-color-tertiary) !important;
+    font-weight: 600;
+  }
+  
+  p {
+    color: var(--ion-color-medium) !important;
+    font-size: 0.85rem !important;
+  }
+  
+  ion-toggle {
+    --handle-background-checked: var(--ion-color-tertiary);
+    --track-background-checked: var(--ion-color-tertiary-tint);
+  }
+}
+
 .action-buttons {
   display: flex;
   gap: 0.5rem;

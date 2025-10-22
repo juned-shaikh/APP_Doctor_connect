@@ -107,6 +107,22 @@
                   </ion-label>
                 </ion-item>
               </ion-col>
+
+              <!-- Video Consultation Access Control for Doctors -->
+              <ion-col size="12" *ngIf="user.role === 'doctor'">
+                <ion-item lines="none" class="user-detail video-consultation-control">
+                  <ion-icon name="videocam-outline" slot="start"></ion-icon>
+                  <ion-label>
+                    <h3>Video Consultation Access</h3>
+                    <p>Allow doctor to enable video consultations</p>
+                  </ion-label>
+                  <ion-toggle 
+                    slot="end"
+                    [checked]="user.videoConsultationAccess || false"
+                    (ionChange)="toggleVideoConsultationAccess(user, $event)">
+                  </ion-toggle>
+                </ion-item>
+              </ion-col>
               
               <ion-col size="12">
                 <ion-item lines="none" class="user-detail">

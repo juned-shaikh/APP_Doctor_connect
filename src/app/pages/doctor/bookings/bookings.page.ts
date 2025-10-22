@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
 import {
   IonContent, IonHeader, IonTitle, IonToolbar, IonCard, IonCardContent,
   IonButton, IonIcon, IonText, IonBackButton, IonButtons, IonChip, IonLabel,
@@ -18,7 +18,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../services/auth.service';
-import { FirebaseService, AppointmentData } from '../../../services/firebase.service';
+import { FirebaseService } from '../../../services/firebase.service';
 import { AppointmentService } from '../../../services/appointment.service';
 import { LocalNotificationService } from '../../../services/local-notification.service';
 import { Subscription } from 'rxjs';
@@ -391,7 +391,7 @@ import { Subscription } from 'rxjs';
   ],
   standalone: true
 })
-export class DoctorBookingsPage implements OnInit {
+export class DoctorBookingsPage implements OnInit, OnDestroy {
   bookings: any[] = [];
   filteredBookings: any[] = [];
   selectedFilter = 'all';
@@ -408,6 +408,7 @@ export class DoctorBookingsPage implements OnInit {
   constructor(
     private authService: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
     private actionSheetController: ActionSheetController,
     private alertController: AlertController,
     private toastController: ToastController,
@@ -425,21 +426,50 @@ export class DoctorBookingsPage implements OnInit {
   }
 
   ngOnInit() {
-    // Subscribe to live appointments for this doctor
+    // Check for query parameters to set initial filter
+    this.route.queryParams.subscribe(params => {
+      if (params['filter']) {
+        this.selectedFilter = params['filter'];
+        console.log('[DoctorBookingsPage] 🎯 Filter set from query params:', this.selectedFilter);
+      }
+    });
+    
+    this.initializeBookings();
+  }
+
+  private initializeBookings() {
+    // Subscribe to auth state changes to handle refresh scenarios
+    this.authService.currentUser$.subscribe((user: any) => {
+      if (user?.uid) {
+        console.log('[DoctorBookingsPage] 👤 User authenticated:', user.uid);
+        this.subscribeToDoctorBookings(user.uid);
+      } else {
+        console.log('[DoctorBookingsPage] ❌ User not authenticated in observable');
+        // Check if there's a current user synchronously (for refresh scenarios)
+        this.checkAuthWithRetry();
+      }
+    });
+  }
+
+  private checkAuthWithRetry(retryCount = 0) {
     const currentUser = this.authService.getCurrentUser();
     if (currentUser?.uid) {
+      console.log('[DoctorBookingsPage] 🔄 Found user on retry:', currentUser.uid);
       this.subscribeToDoctorBookings(currentUser.uid);
-    } else {
-      // Fallback: wait briefly for auth state, then try again
+    } else if (retryCount < 3) {
+      // Retry after a short delay (auth state might still be loading)
+      console.log('[DoctorBookingsPage] ⏳ Retrying auth check in 500ms, attempt:', retryCount + 1);
       setTimeout(() => {
-        const user = this.authService.getCurrentUser();
-        if (user?.uid) {
-          this.subscribeToDoctorBookings(user.uid);
-        } else {
-          this.isLoading = false;
-          console.error('Doctor not authenticated');
-        }
+        this.checkAuthWithRetry(retryCount + 1);
       }, 500);
+    } else {
+      console.log('[DoctorBookingsPage] ❌ No user found after retries');
+      this.isLoading = false;
+      this.bookings = [];
+      this.filteredBookings = [];
+      
+      // Show a message to the user and provide option to refresh or login
+      this.showToast('Session expired. Please refresh the page or login again.', 'warning');
     }
   }
 
@@ -450,6 +480,9 @@ export class DoctorBookingsPage implements OnInit {
   private subscribeToDoctorBookings(doctorUid: string) {
     this.isLoading = true;
     this.bookingsSub?.unsubscribe();
+    
+    console.log('[DoctorBookingsPage] 🔄 Subscribing to bookings for doctor:', doctorUid);
+    
     this.bookingsSub = this.firebaseService.getAppointmentsByDoctor(doctorUid).subscribe({
       next: (appointments) => {
         console.log('[DoctorBookingsPage] 📝 Appointments received:', appointments.length);
@@ -486,10 +519,17 @@ export class DoctorBookingsPage implements OnInit {
         this.calculateStats();
         this.filterBookings();
         this.isLoading = false;
+        
+        console.log('[DoctorBookingsPage] ✅ Bookings loaded successfully');
+        console.log('[DoctorBookingsPage] 📊 Current filter:', this.selectedFilter);
+        console.log('[DoctorBookingsPage] 📋 Filtered bookings:', this.filteredBookings.length);
       },
       error: (err) => {
-        console.error('Error subscribing to bookings:', err);
+        console.error('[DoctorBookingsPage] ❌ Error subscribing to bookings:', err);
         this.isLoading = false;
+        
+        // Show user-friendly error message
+        this.showToast('Failed to load appointments. Please refresh the page.', 'danger');
       }
     });
   }
@@ -535,8 +575,21 @@ console.log(this.pendingApprovals)
   }
 
   async refreshBookings(event?: any) {
-    // Live updates are already active; just complete refresher
-    if (event) event.target.complete();
+    console.log('[DoctorBookingsPage] 🔄 Manual refresh triggered');
+    
+    // Re-initialize bookings to handle any auth state issues
+    const currentUser = this.authService.getCurrentUser();
+    if (currentUser?.uid) {
+      this.subscribeToDoctorBookings(currentUser.uid);
+    } else {
+      // Try to get user from observable
+      this.initializeBookings();
+    }
+    
+    // Complete refresher after a short delay to show loading
+    setTimeout(() => {
+      if (event) event.target.complete();
+    }, 1000);
   }
 
   getEmptyStateMessage(): string {
