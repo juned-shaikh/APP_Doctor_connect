@@ -431,6 +431,10 @@ export class DoctorBookingsPage implements OnInit, OnDestroy {
       if (params['filter']) {
         this.selectedFilter = params['filter'];
         console.log('[DoctorBookingsPage] 🎯 Filter set from query params:', this.selectedFilter);
+        // If bookings are already loaded, re-filter them
+        if (this.bookings.length > 0) {
+          this.filterBookings();
+        }
       }
     });
     
@@ -520,6 +524,15 @@ export class DoctorBookingsPage implements OnInit, OnDestroy {
         this.filterBookings();
         this.isLoading = false;
         
+        // Log current state for debugging
+        console.log('[DoctorBookingsPage] 📊 Stats calculated:', {
+          total: this.bookings.length,
+          pending: this.pendingApprovals,
+          today: this.todayBookings,
+          selectedFilter: this.selectedFilter,
+          filteredCount: this.filteredBookings.length
+        });
+        
         console.log('[DoctorBookingsPage] ✅ Bookings loaded successfully');
         console.log('[DoctorBookingsPage] 📊 Current filter:', this.selectedFilter);
         console.log('[DoctorBookingsPage] 📋 Filtered bookings:', this.filteredBookings.length);
@@ -545,10 +558,20 @@ export class DoctorBookingsPage implements OnInit, OnDestroy {
       new Date(booking.date).toDateString() === today.toDateString()
     ).length;
 
-    this.pendingApprovals = this.bookings.filter(booking =>
-      booking.status === 'pending'
-    ).length;
-console.log(this.pendingApprovals)
+    this.pendingApprovals = this.bookings.filter(booking => {
+      const isPending = booking.status?.toLowerCase() === 'pending';
+      if (isPending) {
+        console.log('[DoctorBookingsPage] 📋 Found pending booking for stats:', {
+          id: booking.id,
+          patientName: booking.patientName,
+          status: booking.status,
+          date: booking.date
+        });
+      }
+      return isPending;
+    }).length;
+    
+    console.log('[DoctorBookingsPage] 📊 Pending approvals count:', this.pendingApprovals);
     const weeklyBookings = this.bookings.filter(booking =>
       new Date(booking.date) >= weekAgo && new Date(booking.date) <= today
     );
@@ -560,17 +583,54 @@ console.log(this.pendingApprovals)
   }
 
   onFilterChange(event: any) {
-    this.selectedFilter = event.detail.value;
+    const newFilter = event.detail.value;
+    console.log('[DoctorBookingsPage] 🔄 Filter changed from', this.selectedFilter, 'to', newFilter);
+    this.selectedFilter = newFilter;
     this.filterBookings();
+    
+    // Update URL to reflect current filter
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { filter: newFilter === 'all' ? null : newFilter },
+      queryParamsHandling: 'merge'
+    });
   }
 
   filterBookings() {
+    console.log('[DoctorBookingsPage] 🔍 Filtering bookings with filter:', this.selectedFilter);
+    console.log('[DoctorBookingsPage] 📋 Total bookings to filter:', this.bookings.length);
+    
     if (this.selectedFilter === 'all') {
       this.filteredBookings = [...this.bookings];
     } else {
-      this.filteredBookings = this.bookings.filter(booking =>
-        booking.status.toLowerCase() === this.selectedFilter
-      );
+      this.filteredBookings = this.bookings.filter(booking => {
+        const bookingStatus = booking.status?.toLowerCase() || '';
+        const matches = bookingStatus === this.selectedFilter.toLowerCase();
+        
+        if (this.selectedFilter === 'pending' && matches) {
+          console.log('[DoctorBookingsPage] ✅ Found pending booking:', {
+            id: booking.id,
+            patientName: booking.patientName,
+            status: booking.status,
+            date: booking.date
+          });
+        }
+        
+        return matches;
+      });
+    }
+    
+    console.log('[DoctorBookingsPage] 📊 Filtered results:', {
+      filter: this.selectedFilter,
+      totalBookings: this.bookings.length,
+      filteredCount: this.filteredBookings.length
+    });
+    
+    // Sort filtered bookings by date (newest first for pending, oldest first for others)
+    if (this.selectedFilter === 'pending') {
+      this.filteredBookings.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    } else {
+      this.filteredBookings.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
   }
 

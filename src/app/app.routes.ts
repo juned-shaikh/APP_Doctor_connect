@@ -45,10 +45,5 @@ export const routes: Routes = [
   {
     path: 'video-demo',
     loadComponent: () => import('./pages/video-demo/video-demo.page').then(m => m.VideoDemoPage)
-  },
-  {
-    path: 'simple-notification-test',
-    loadComponent: () => import('./components/simple-notification-test.component').then(m => m.SimpleNotificationTestComponent)
   }
-
 ];

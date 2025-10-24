@@ -1,7 +1,7 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/patient/dashboard"></ion-back-button>
+      <ion-back-button defaultHref="/patient/dashboard" (click)="handleBackButton($event)"></ion-back-button>
     </ion-buttons>
     <ion-title>Book Appointment</ion-title>
   </ion-toolbar>

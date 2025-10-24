@@ -21,7 +21,7 @@ import { CommonModule } from '@angular/common';
 
 interface TimeSlot {
   time: string;
-  booked?: boolean;
+  booked: boolean;
 }
 
 interface DateOption {
@@ -37,20 +37,11 @@ interface Doctor {
   consultationFee?: number;
   videoConsultationFee?: number;
   videoConsultationEnabled?: boolean;
-  videoConsultationAccess?: boolean; // Set by super admin
+  videoConsultationAccess?: boolean;
   rating?: number;
   reviewCount?: number;
   experience?: number;
   avatar?: string;
-}
-
-interface BookingFormData {
-  patientName: string;
-  age: number;
-  gender: string;
-  phone: string;
-  symptoms: string;
-  paymentMethod: string;
 }
 
 @Component({
@@ -66,26 +57,19 @@ interface BookingFormData {
   ]
 })
 export class BookAppointmentPage implements OnInit {
+  // Core data
   selectedDoctor: Doctor | null = null;
+  schedule: DoctorSchedule | null = null;
+  appointments: any[] = [];
+  
+  // UI state
   selectedDate: string = '';
   selectedTime: TimeSlot | null = null;
+  availableDates: DateOption[] = [];
+  timeSlots: TimeSlot[] = [];
   bookingForm!: FormGroup;
   isLoading = false;
   isLoadingSchedule = true;
-  private schedule: DoctorSchedule | null = null;
-  private doctorAppointments: any[] = [];
-
-  appointmentData: BookingFormData = {
-    patientName: '',
-    age: 0,
-    gender: '',
-    phone: '',
-    symptoms: '',
-    paymentMethod: ''
-  };
-
-  availableDates: DateOption[] = [];
-  timeSlots: TimeSlot[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -104,325 +88,218 @@ export class BookAppointmentPage implements OnInit {
     });
   }
 
-  private getDayKey(d: Date): string {
-    const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    return keys[d.getDay()];
-  }
-
-  private to12h(d: Date): string {
-    let hours = d.getHours();
-    const minutes = d.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    if (hours === 0) hours = 12;
-    const mm = minutes < 10 ? '0' + minutes : minutes.toString();
-    const hh = hours < 10 ? (hours).toString() : hours.toString();
-    return `${hh}:${mm} ${ampm}`;
-  }
-
-  // Live availability helpers for template
-  get slotDurationMinutes(): number {
-    return this.schedule?.slotMinutes || 10;
-  }
-
-  get dayWindow(): { start: string; end: string; enabled: boolean } | null {
-    if (!this.selectedDate) return null;
-    const dayKey = this.getDayKey(new Date(this.selectedDate));
-    let start = '10:00', end = '14:00';
-    let enabled = true;
-    if (this.schedule?.weekly && (this.schedule.weekly as any)[dayKey]) {
-      const d = (this.schedule.weekly as any)[dayKey];
-      enabled = d.enabled !== false;
-      start = d.start || start;
-      end = d.end || end;
-    }
-    const ex = this.schedule?.exceptions?.find(e => e.date === this.selectedDate);
-    if (ex) {
-      if (ex.closed) enabled = false;
-      else {
-        start = ex.start || start;
-        end = ex.end || end;
-      }
-    }
-    return { start, end, enabled };
-  }
-
-  get bookedCountForSelectedDate(): number {
-    if (!this.selectedDate) return 0;
-    const selectedISO = this.selectedDate;
-    return this.doctorAppointments.filter(a => new Date(a.date).toISOString().split('T')[0] === selectedISO && a.status !== 'cancelled').length;
-  }
-
-  get maxPatientsForSelectedDate(): number | null {
-    if (!this.selectedDate) return null;
-    const dayKey = this.getDayKey(new Date(this.selectedDate));
-    const d = this.schedule?.weekly && (this.schedule.weekly as any)[dayKey];
-    return d?.maxPatients ?? null;
-  }
-
-  get remainingCapacityForSelectedDate(): number | null {
-    const max = this.maxPatientsForSelectedDate;
-    if (max == null) return null;
-    return Math.max(0, max - this.bookedCountForSelectedDate);
-  }
-
   ngOnInit() {
     this.initializeForm();
-    this.loadDoctorDetails();
-    // Available dates will be generated after schedule is loaded
-    this.generateTimeSlots();
+    this.loadDoctorData();
   }
 
-  initializeForm() {
+  private initializeForm() {
     this.bookingForm = this.fb.group({
       patientName: ['', [Validators.required, Validators.minLength(2)]],
-      age: ['', [Validators.required, Validators.min(1), Validators.max(120), Validators.pattern(/^[0-9]{1,3}$/)]],
-      phone: ['', [Validators.required, Validators.pattern(/^[0-9]{10,15}$/), Validators.minLength(10)]],
+      age: ['', [Validators.required, Validators.min(1), Validators.max(120)]],
+      phone: ['', [Validators.required, Validators.pattern(/^[0-9]{10,15}$/)]],
       appointmentType: ['clinic', Validators.required],
-      // Keep paymentMethod but default to 'cash'
       paymentMethod: ['cash', Validators.required]
     });
-
-    // Add form value changes listener for debugging
-    this.bookingForm.valueChanges.subscribe(values => {
-      console.log('Form values changed:', values);
-      console.log('Form valid:', this.bookingForm.valid);
-    });
   }
 
-  // Update appointment type when doctor data is loaded
-  private updateAppointmentTypeOptions() {
-    if (this.bookingForm && this.selectedDoctor) {
-      // If video consultation is not available, ensure clinic is selected
-      if (!this.isVideoConsultationAvailable()) {
-        this.bookingForm.patchValue({ appointmentType: 'clinic' });
-      }
-    }
-  }
-
-  async loadDoctorDetails() {
+  private async loadDoctorData() {
     const doctorId = this.route.snapshot.paramMap.get('doctorId');
+    if (!doctorId) {
+      this.showToast('Doctor not found', 'danger');
+      return;
+    }
 
-    if (doctorId) {
-      try {
-        // Fetch doctor details from Firebase
-        this.firebaseService.getUserById(doctorId).subscribe({
-          next: (doctor) => {
-            if (doctor && doctor.role === 'doctor') {
-              this.selectedDoctor = {
-                id: doctor.uid,
-                name: doctor.name,
-                specialization: doctor.specialization || 'General Medicine',
-                consultationFee: doctor.consultationFee || 500,
-                videoConsultationFee: doctor.consultation?.videoFee || 0,
-                videoConsultationEnabled: doctor.consultation?.videoEnabled || false,
-                videoConsultationAccess: doctor.videoConsultationAccess || false,
-                rating: doctor.rating || 4.5,
-                reviewCount: doctor.reviewCount || 0,
-                experience: doctor.experience || 5,
-                avatar: doctor.avatar
-              };
+    try {
+      // Load doctor details
+      this.firebaseService.getUserById(doctorId).subscribe(doctor => {
+        if (doctor && doctor.role === 'doctor') {
+          this.selectedDoctor = {
+            id: doctor.uid,
+            name: doctor.name,
+            specialization: doctor.specialization || 'General Medicine',
+            consultationFee: doctor.consultationFee || 500,
+            videoConsultationFee: doctor.consultation?.videoFee || 0,
+            videoConsultationEnabled: doctor.consultation?.videoEnabled || false,
+            videoConsultationAccess: doctor.videoConsultationAccess || false,
+            rating: doctor.rating || 4.5,
+            reviewCount: doctor.reviewCount || 0,
+            experience: doctor.experience || 5,
+            avatar: doctor.avatar
+          };
+        }
+      });
 
-              // Update appointment type options based on doctor's video consultation availability
-              this.updateAppointmentTypeOptions();
+      // Load doctor's schedule
+      this.scheduleService.getSchedule(doctorId).subscribe(schedule => {
+        this.schedule = schedule;
+        this.isLoadingSchedule = false;
+        this.generateAvailableDates();
+      });
 
-              // Subscribe to doctor's schedule
-              this.scheduleService.getSchedule(doctorId).subscribe(s => {
-                this.schedule = s;
-                this.isLoadingSchedule = false;
+      // Load doctor's appointments
+      this.firebaseService.getAppointmentsByDoctor(doctorId).subscribe(appointments => {
+        this.appointments = appointments;
+        if (this.selectedDate) {
+          this.generateTimeSlots();
+        }
+      });
 
-                // Regenerate available dates when schedule arrives/changes
-                this.generateAvailableDates();
-
-                // Check if currently selected date is still available
-                if (this.selectedDate) {
-                  const isStillAvailable = this.availableDates.some(d => d.value === this.selectedDate);
-                  if (!isStillAvailable) {
-                    this.selectedDate = '';
-                    this.selectedTime = null;
-                  } else {
-                    this.generateTimeSlots();
-                  }
-                }
-              });
-
-              // Subscribe to doctor's appointments to mark booked slots
-              this.firebaseService.getAppointmentsByDoctor(doctorId).subscribe(apps => {
-                this.doctorAppointments = apps;
-                if (this.selectedDate) {
-                  this.generateTimeSlots();
-                }
-              });
-            } else {
-              // Fallback to mock data if doctor not found
-              this.setMockDoctorData(doctorId);
-            }
-          },
-          error: (error) => {
-            console.error('Error loading doctor details:', error);
-            this.setMockDoctorData(doctorId);
-          }
-        });
-      } catch (error) {
-        console.error('Error loading doctor details:', error);
-        this.setMockDoctorData(doctorId);
-      }
+    } catch (error) {
+      console.error('Error loading doctor data:', error);
+      this.showToast('Error loading doctor information', 'danger');
     }
   }
 
-  private setMockDoctorData(doctorId: string) {
-    this.selectedDoctor = {
-      id: doctorId,
-      name: 'Dr. Sarah Johnson',
-      specialization: 'Cardiologist',
-      consultationFee: 500,
-      videoConsultationFee: 300,
-      videoConsultationEnabled: true,
-      videoConsultationAccess: true, // Mock data has video access enabled
-      rating: 4.8,
-      reviewCount: 156,
-      experience: 10
-    };
-    
-    // Update appointment type options for mock data
-    this.updateAppointmentTypeOptions();
-  }
+  private generateAvailableDates() {
+    if (!this.schedule) return;
 
-  generateAvailableDates() {
-    const dates = [];
+    const dates: DateOption[] = [];
     const today = new Date();
-
-    // Look ahead for up to 30 days to find available dates
+    
+    // Look for next 30 days
     for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
+      const date = new Date();
       date.setDate(today.getDate() + i);
-
-      const dayKey = this.getDayKey(date);
-      const dateString = date.toISOString().split('T')[0];
-
-      // Check if this day is enabled in the doctor's schedule
-      let isEnabled = false;
-
-      if (this.schedule?.weekly && (this.schedule.weekly as any)[dayKey]) {
-        isEnabled = (this.schedule.weekly as any)[dayKey].enabled === true;
-      }
-
-      // Check for exceptions on this specific date
-      const exception = this.schedule?.exceptions?.find(ex => ex.date === dateString);
-      if (exception) {
-        isEnabled = !exception.closed;
-      }
-
-      // Only add dates that are enabled
-      if (isEnabled) {
+      
+      const dayName = this.getDayName(date);
+      const dateString = this.formatDateString(date);
+      
+      // Check if this day is enabled in schedule
+      if (this.isDayEnabled(dayName, dateString)) {
         dates.push({
           day: date.toLocaleDateString('en-US', { weekday: 'short' }),
           date: date.getDate().toString(),
           value: dateString
         });
-
-        // Stop after finding 7 available dates
+        
+        // Stop after 7 available dates
         if (dates.length >= 7) break;
       }
     }
-
+    
     this.availableDates = dates;
   }
 
-  generateTimeSlots() {
-    // If no date or doctor, clear
-    if (!this.selectedDate || !this.selectedDoctor) {
-      this.timeSlots = [];
-      return;
-    }
-
-    // Determine day schedule (defaults 10:00–14:00 if none)
-    const dayKey = this.getDayKey(new Date(this.selectedDate));
-    let start = '10:00';
-    let end = '14:00';
-    let enabled = true;
-    let slotMinutes = this.schedule?.slotMinutes || 10;
-
-    if (this.schedule?.weekly && (this.schedule.weekly as any)[dayKey]) {
-      const d = (this.schedule.weekly as any)[dayKey];
-      enabled = d.enabled !== false;
-      start = d.start || start;
-      end = d.end || end;
-    }
-
-    // Apply exception for exact date
-    const ex = this.schedule?.exceptions?.find(e => e.date === this.selectedDate);
-    if (ex) {
-      if (ex.closed) {
-        enabled = false;
-      } else {
-        start = ex.start || start;
-        end = ex.end || end;
-      }
-    }
-
-    if (!enabled) {
-      this.timeSlots = [];
-      return;
-    }
-
-    // Build slots at slotMinutes increments
-    const slots: TimeSlot[] = [];
-    const [sH, sM] = start.split(':').map(n => parseInt(n, 10));
-    const [eH, eM] = end.split(':').map(n => parseInt(n, 10));
-    const base = new Date(this.selectedDate + 'T00:00:00');
-    const startDate = new Date(base);
-    startDate.setHours(sH, sM, 0, 0);
-    const endDate = new Date(base);
-    endDate.setHours(eH, eM, 0, 0);
-
-    for (let t = new Date(startDate); t < endDate; t = new Date(t.getTime() + slotMinutes * 60000)) {
-      const label = this.to12h(t);
-      slots.push({ time: label, booked: false });
-    }
-
-    // Mark booked slots for selected date
-    const selectedISO = this.selectedDate;
-    const bookedTimes = new Set(
-      this.doctorAppointments
-        .filter(a => new Date(a.date).toISOString().split('T')[0] === selectedISO && a.status !== 'cancelled')
-        .map(a => a.time)
-    );
-
-    // Apply capacity limits if configured
-    let max = undefined as number | undefined;
-    if (this.schedule?.weekly && (this.schedule.weekly as any)[dayKey]) {
-      const d = (this.schedule.weekly as any)[dayKey];
-      max = d.maxPatients;
-    }
-
-    let result = slots.map(s => ({ ...s, booked: bookedTimes.has(s.time) }));
-    if (typeof max === 'number' && max > 0) {
-      const alreadyBookedCount = result.filter(r => r.booked).length;
-      const remaining = Math.max(0, max - alreadyBookedCount);
-      if (remaining <= 0) {
-        // All capacity consumed; mark all as booked
-        result = result.map(r => ({ ...r, booked: true }));
-      } else {
-        // Allow only first `remaining` unbooked slots; mark the rest as booked
-        let allowed = 0;
-        result = result.map(r => {
-          if (r.booked) return r;
-          if (allowed < remaining) {
-            allowed++;
-            return r;
-          }
-          return { ...r, booked: true };
-        });
-      }
-    }
-    this.timeSlots = result;
+  private getDayName(date: Date): string {
+    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    return days[date.getDay()];
   }
 
-  selectDate(date: string) {
-    this.selectedDate = date;
-    this.selectedTime = null; // Reset time selection
+  private formatDateString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private isDayEnabled(dayName: string, dateString: string): boolean {
+    if (!this.schedule?.weekly) return false;
+    
+    const daySchedule = (this.schedule.weekly as any)[dayName];
+    if (!daySchedule || !daySchedule.enabled) return false;
+    
+    // Check for exceptions
+    const exception = this.schedule.exceptions?.find(ex => ex.date === dateString);
+    if (exception && exception.closed) return false;
+    
+    return true;
+  }
+
+  selectDate(dateValue: string) {
+    this.selectedDate = dateValue;
+    this.selectedTime = null;
     this.generateTimeSlots();
+  }
+
+  private generateTimeSlots() {
+    if (!this.selectedDate || !this.schedule) {
+      this.timeSlots = [];
+      return;
+    }
+
+    const date = new Date(this.selectedDate + 'T00:00:00');
+    const dayName = this.getDayName(date);
+    const daySchedule = (this.schedule.weekly as any)[dayName];
+    
+    if (!daySchedule || !daySchedule.enabled) {
+      this.timeSlots = [];
+      return;
+    }
+
+    // Get schedule times
+    const startTime = daySchedule.start || '10:00';
+    const endTime = daySchedule.end || '14:00';
+    const slotDuration = this.schedule.slotMinutes || 10;
+
+    // Generate time slots
+    const slots = this.generateSlots(startTime, endTime, slotDuration);
+    
+    // Mark booked slots
+    const bookedTimes = this.getBookedTimes(this.selectedDate);
+    
+    this.timeSlots = slots.map(time => ({
+      time,
+      booked: bookedTimes.has(time)
+    }));
+  }
+
+  private generateSlots(startTime: string, endTime: string, duration: number): string[] {
+    const slots: string[] = [];
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const start = startHour * 60 + startMin;
+    const end = endHour * 60 + endMin;
+    
+    for (let minutes = start; minutes < end; minutes += duration) {
+      const hour = Math.floor(minutes / 60);
+      const min = minutes % 60;
+      const time12 = this.convertTo12Hour(hour, min);
+      slots.push(time12);
+    }
+    
+    return slots;
+  }
+
+  private convertTo12Hour(hour: number, minute: number): string {
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    const minStr = minute.toString().padStart(2, '0');
+    return `${hour12}:${minStr} ${ampm}`;
+  }
+
+  private getBookedTimes(dateString: string): Set<string> {
+    const bookedTimes = new Set<string>();
+    
+    this.appointments.forEach(appointment => {
+      if (appointment.status === 'cancelled') return;
+      
+      const appointmentDate = this.getAppointmentDateString(appointment.date);
+      if (appointmentDate === dateString) {
+        bookedTimes.add(appointment.time);
+      }
+    });
+    
+    return bookedTimes;
+  }
+
+  private getAppointmentDateString(date: any): string {
+    if (!date) return '';
+    
+    if (date instanceof Date) {
+      return this.formatDateString(date);
+    }
+    
+    if (typeof date === 'string') {
+      return date.split('T')[0];
+    }
+    
+    if (date.toDate && typeof date.toDate === 'function') {
+      return this.formatDateString(date.toDate());
+    }
+    
+    return '';
   }
 
   selectTime(slot: TimeSlot) {
@@ -431,51 +308,55 @@ export class BookAppointmentPage implements OnInit {
     }
   }
 
-  get window(): string {
-    if (!this.schedule) return '';
-    const dayKey = this.getDayKey(new Date(this.selectedDate));
-    const start = this.schedule.weekly && (this.schedule.weekly as any)[dayKey] ? (this.schedule.weekly as any)[dayKey].start : '10:00';
-    const end = this.schedule.weekly && (this.schedule.weekly as any)[dayKey] ? (this.schedule.weekly as any)[dayKey].end : '14:00';
-    return `${start}–${end}`;
+  // Getters for template
+  get dayWindow(): { start: string; end: string; enabled: boolean } | null {
+    if (!this.selectedDate || !this.schedule) return null;
+    
+    const date = new Date(this.selectedDate + 'T00:00:00');
+    const dayName = this.getDayName(date);
+    const daySchedule = (this.schedule.weekly as any)[dayName];
+    
+    if (!daySchedule) return { start: '10:00', end: '14:00', enabled: false };
+    
+    return {
+      start: daySchedule.start || '10:00',
+      end: daySchedule.end || '14:00',
+      enabled: daySchedule.enabled || false
+    };
   }
 
-  get slotMinutes(): number {
+  get slotDurationMinutes(): number {
     return this.schedule?.slotMinutes || 10;
   }
 
-  get bookedCount(): number {
-    return this.timeSlots.filter(slot => slot.booked).length;
+  get bookedCountForSelectedDate(): number {
+    if (!this.selectedDate) return 0;
+    return this.getBookedTimes(this.selectedDate).size;
   }
 
-  get remainingCount(): number {
-    const max = this.schedule?.weekly && (this.schedule.weekly as any)[this.getDayKey(new Date(this.selectedDate))] ? (this.schedule.weekly as any)[this.getDayKey(new Date(this.selectedDate))].maxPatients : undefined;
-    if (typeof max === 'number' && max > 0) {
-      return Math.max(0, max - this.bookedCount);
-    }
-    return this.timeSlots.length - this.bookedCount;
+  get maxPatientsForSelectedDate(): number | null {
+    if (!this.selectedDate || !this.schedule) return null;
+    
+    const date = new Date(this.selectedDate + 'T00:00:00');
+    const dayName = this.getDayName(date);
+    const daySchedule = (this.schedule.weekly as any)[dayName];
+    
+    return daySchedule?.maxPatients || null;
+  }
+
+  get remainingCapacityForSelectedDate(): number | null {
+    const max = this.maxPatientsForSelectedDate;
+    if (max === null) return null;
+    return Math.max(0, max - this.bookedCountForSelectedDate);
   }
 
   canBookAppointment(): boolean {
-    if (!this.bookingForm) return false;
     return this.bookingForm.valid && !!this.selectedDate && !!this.selectedTime;
-  }
-
-  getFormErrors(): any {
-    if (!this.bookingForm) return {};
-
-    const errors: any = {};
-    Object.keys(this.bookingForm.controls).forEach(key => {
-      const control = this.bookingForm.get(key);
-      if (control && control.errors) {
-        errors[key] = control.errors;
-      }
-    });
-    return errors;
   }
 
   getFormattedDate(dateString: string): string {
     if (!dateString) return '';
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -484,14 +365,22 @@ export class BookAppointmentPage implements OnInit {
     });
   }
 
+  getConsultationFee(): number {
+    if (!this.selectedDoctor) return 0;
+    const appointmentType = this.bookingForm?.get('appointmentType')?.value;
+    if (appointmentType === 'video') {
+      return this.selectedDoctor.videoConsultationFee || 0;
+    }
+    return this.selectedDoctor.consultationFee || 500;
+  }
+
+  isVideoConsultationAvailable(): boolean {
+    return !!(this.selectedDoctor?.videoConsultationAccess && this.selectedDoctor?.videoConsultationEnabled);
+  }
+
   async bookAppointment() {
     if (!this.canBookAppointment()) {
-      const toast = await this.toastController.create({
-        message: 'Please fill in all required fields',
-        duration: 3000,
-        color: 'warning'
-      });
-      await toast.present();
+      this.showToast('Please fill in all required fields', 'warning');
       return;
     }
 
@@ -499,16 +388,8 @@ export class BookAppointmentPage implements OnInit {
       header: 'Confirm Appointment',
       message: `Book appointment with ${this.selectedDoctor?.name} on ${this.getFormattedDate(this.selectedDate)} at ${this.selectedTime?.time}?`,
       buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        },
-        {
-          text: 'Confirm',
-          handler: () => {
-            this.confirmBooking();
-          }
-        }
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'Confirm', handler: () => this.confirmBooking() }
       ]
     });
 
@@ -520,26 +401,25 @@ export class BookAppointmentPage implements OnInit {
 
     try {
       const formData = this.bookingForm.value;
-
       const currentUser = this.authService.getCurrentUser();
+      
       if (!currentUser) {
         throw new Error('User not authenticated');
       }
 
-      // Create appointment data with proper validation
       const appointmentData = {
         doctorId: this.selectedDoctor?.id || '',
         doctorName: this.selectedDoctor?.name || '',
         patientId: currentUser.uid,
-        patientName: formData.patientName || '',
-        patientPhone: formData.phone || '',
-        patientAge: Number(formData.age) || 0,
-        patientGender: 'Not specified', // Default value
+        patientName: formData.patientName,
+        patientPhone: formData.phone,
+        patientAge: Number(formData.age),
+        patientGender: 'Not specified',
         appointmentType: formData.appointmentType as 'clinic' | 'video',
-        symptoms: formData.symptoms || 'No symptoms specified',
+        symptoms: 'No symptoms specified',
         paymentMethod: formData.paymentMethod as 'cash' | 'online',
         paymentStatus: 'pending' as const,
-        date: new Date(this.selectedDate),
+        date: new Date(this.selectedDate + 'T00:00:00'),
         time: this.selectedTime?.time || '',
         fee: this.getConsultationFee(),
         status: 'pending' as const,
@@ -547,84 +427,55 @@ export class BookAppointmentPage implements OnInit {
         updatedAt: new Date()
       };
 
-      console.log('Saving appointment:', appointmentData);
-
-      // Save to Firebase
       await this.appointmentService.bookAppointment(appointmentData);
-
-      const toast = await this.toastController.create({
-        message: 'Appointment booked successfully!',
-        duration: 2000,
-        color: 'success',
-        position: 'top'
-      });
-
-      await toast.present();
-
-      // Wait for toast to be dismissed before navigating
+      
+      this.showToast('Appointment booked successfully!', 'success');
+      
       setTimeout(() => {
-        this.router.navigate(['/patient/dashboard'], {
-          replaceUrl: true
-        }).catch(err => {
-          console.error('Navigation error:', err);
-          // Fallback to root if navigation fails
-          this.router.navigate(['/']);
-        });
+        this.router.navigate(['/patient/dashboard'], { replaceUrl: true });
       }, 2000);
 
     } catch (error: any) {
-      console.error('Error confirming booking:', error);
-      const errorMessage = error.message || 'Failed to book appointment. Please try again.';
-
-      const toast = await this.toastController.create({
-        message: errorMessage,
-        duration: 3000,
-        color: 'danger',
-        position: 'top'
-      });
-      await toast.present();
+      console.error('Error booking appointment:', error);
+      this.showToast(error.message || 'Failed to book appointment', 'danger');
     } finally {
       this.isLoading = false;
     }
   }
 
-  // Online payment removed; default is Pay at Clinic (cash)
+  handleBackButton(event: Event) {
+    event.preventDefault();
+    event.stopPropagation();
 
-  getConsultationFee(): number {
-    if (!this.selectedDoctor) return 0;
-
-    const appointmentType = this.bookingForm?.get('appointmentType')?.value;
-    if (appointmentType === 'video') {
-      return this.selectedDoctor.videoConsultationFee || 0;
+    const currentUser = this.authService.getCurrentUser();
+    if (currentUser) {
+      if (currentUser.userType === 'patient' || currentUser.role === 'patient') {
+        this.router.navigate(['/patient/dashboard']);
+      } else if (currentUser.userType === 'doctor' || currentUser.role === 'doctor') {
+        this.router.navigate(['/doctor/dashboard']);
+      } else {
+        this.router.navigate(['/auth/login']);
+      }
+    } else {
+      this.router.navigate(['/auth/login']);
     }
-    return this.selectedDoctor.consultationFee || 500;
   }
 
-  // Handle doctor image loading error
   onDoctorImageError() {
     if (this.selectedDoctor) {
       this.selectedDoctor.avatar = undefined;
     }
   }
 
-  // Check if video consultation is available for this doctor
-  isVideoConsultationAvailable(): boolean {
-    return !!(this.selectedDoctor?.videoConsultationAccess && this.selectedDoctor?.videoConsultationEnabled);
-  }
-
-  // Number-only input validation methods
   onNumberKeyPress(event: any): boolean {
     const charCode = event.which ? event.which : event.keyCode;
-    // Allow: backspace, delete, tab, escape, enter
     if ([8, 9, 27, 13, 46].indexOf(charCode) !== -1 ||
-        // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
         (charCode === 65 && event.ctrlKey === true) ||
         (charCode === 67 && event.ctrlKey === true) ||
         (charCode === 86 && event.ctrlKey === true) ||
         (charCode === 88 && event.ctrlKey === true)) {
       return true;
     }
-    // Ensure that it is a number and stop the keypress
     if (charCode < 48 || charCode > 57) {
       event.preventDefault();
       return false;
@@ -634,19 +485,10 @@ export class BookAppointmentPage implements OnInit {
 
   onAgeInput(event: any) {
     const value = event.target.value;
-    // Remove any non-numeric characters
     const numericValue = value.replace(/[^0-9]/g, '');
-    
-    // Limit to 3 digits maximum
     const limitedValue = numericValue.substring(0, 3);
-    
-    // Limit to reasonable age range
     let age = parseInt(limitedValue);
-    if (age > 120) {
-      age = 120;
-    }
-    
-    // Update the form control with cleaned value
+    if (age > 120) age = 120;
     const finalValue = age ? age.toString() : limitedValue;
     if (finalValue !== value) {
       this.bookingForm.patchValue({ age: finalValue });
@@ -655,15 +497,20 @@ export class BookAppointmentPage implements OnInit {
 
   onPhoneInput(event: any) {
     const value = event.target.value;
-    // Remove any non-numeric characters
     const numericValue = value.replace(/[^0-9]/g, '');
-    
-    // Limit to 15 digits (international phone number standard)
     const limitedValue = numericValue.substring(0, 15);
-    
-    // Update the form control with cleaned value
     if (limitedValue !== value) {
       this.bookingForm.patchValue({ phone: limitedValue });
     }
+  }
+
+  private async showToast(message: string, color: string) {
+    const toast = await this.toastController.create({
+      message,
+      duration: 3000,
+      color,
+      position: 'bottom'
+    });
+    await toast.present();
   }
 }

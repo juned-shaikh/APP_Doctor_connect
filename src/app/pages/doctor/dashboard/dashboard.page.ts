@@ -567,7 +567,20 @@ doctorProfile: User | null = null;
         const todays = appointments.filter(a => new Date(a.date).toDateString() === today.toDateString());
         
         // Count pending appointments for notification badge
-        this.pendingAppointmentsCount = appointments.filter(a => a.status.toLowerCase() === 'pending').length;
+        const pendingAppointments = appointments.filter(a => {
+          const isPending = a.status?.toLowerCase() === 'pending';
+          if (isPending) {
+            console.log('[DoctorDashboard] 📋 Found pending appointment:', {
+              id: a.id,
+              patientName: a.patientName,
+              status: a.status,
+              date: a.date
+            });
+          }
+          return isPending;
+        });
+        this.pendingAppointmentsCount = pendingAppointments.length;
+        console.log('[DoctorDashboard] 🔔 Pending appointments count:', this.pendingAppointmentsCount);
         
         // Map to UI model expected by template
         this.upcomingAppointments = todays.map(a => ({
@@ -674,6 +687,7 @@ getDoctorSpecialization(): string {
   }
 
   viewPendingAppointments() {
+    console.log('[DoctorDashboard] 🔔 Navigating to pending appointments, count:', this.pendingAppointmentsCount);
     // Navigate to bookings page with pending tab selected
     this.router.navigate(['/doctor/bookings'], { 
       queryParams: { filter: 'pending' } 

@@ -1031,13 +1031,7 @@ export class PatientDashboardPage implements OnInit, OnDestroy {
             this.router.navigate(['/patient/settings']);
           }
         },
-        {
-          text: 'Notification Test',
-          icon: 'notifications-outline',
-          handler: () => {
-            this.router.navigate(['/patient/simple-notification-test']);
-          }
-        },
+
         {
           text: 'Logout',
           icon: 'log-out-outline',

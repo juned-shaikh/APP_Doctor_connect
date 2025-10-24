@@ -19,7 +19,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../services/auth.service';
 import { FirebaseService } from '../../../services/firebase.service';
 import { AppointmentService } from '../../../services/appointment.service';
-import { NotificationService } from '../../../services/notification.service';
+
 import { LocalNotificationService } from '../../../services/local-notification.service';
 
 @Component({
@@ -32,9 +32,6 @@ import { LocalNotificationService } from '../../../services/local-notification.s
         </ion-buttons>
         <ion-title>My Appointments</ion-title>
         <ion-buttons slot="end">
-          <ion-button fill="clear" (click)="testNotification()">
-            <ion-icon name="notifications-outline"></ion-icon>
-          </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -81,7 +78,12 @@ import { LocalNotificationService } from '../../../services/local-notification.s
 
         <!-- Appointments List -->
         <div *ngIf="!isLoading && filteredAppointments.length > 0" class="appointments-list">
-          <ion-card *ngFor="let appointment of filteredAppointments" class="appointment-card">
+          <ng-container *ngFor="let appointment of filteredAppointments; let i = index">
+            <!-- Date separator for upcoming appointments -->
+            <div *ngIf="selectedFilter === 'upcoming' && shouldShowDateSeparator(appointment, i)" class="date-separator">
+              <h4>{{ formatDateSeparator(appointment.date) }}</h4>
+            </div>
+            <ion-card class="appointment-card">
             <ion-card-content>
               <div class="appointment-header">
                 <div class="doctor-info">
@@ -111,7 +113,7 @@ import { LocalNotificationService } from '../../../services/local-notification.s
                 </div>
                 <div class="detail-item">
                   <ion-icon name="calendar-outline" color="primary"></ion-icon>
-                  <span>{{ formatDate(appointment.date) }}</span>
+                  <span>{{ formatDate(appointment.date) }} {{ getRelativeDate(appointment.date) }}</span>
                 </div>
                 <div class="detail-item">
                   <ion-icon name="time-outline" color="primary"></ion-icon>
@@ -143,7 +145,8 @@ import { LocalNotificationService } from '../../../services/local-notification.s
                 </div>
               </div>
             </ion-card-content>
-          </ion-card>
+            </ion-card>
+          </ng-container>
         </div>
       </div>
     </ion-content>
@@ -216,6 +219,20 @@ import { LocalNotificationService } from '../../../services/local-notification.s
       display: flex;
       flex-direction: column;
       gap: 1rem;
+    }
+    
+    .date-separator {
+      margin: 1.5rem 0 0.5rem 0;
+      padding: 0 0.5rem;
+    }
+    
+    .date-separator h4 {
+      margin: 0;
+      color: var(--ion-color-primary);
+      font-weight: 600;
+      font-size: 1.1rem;
+      border-bottom: 2px solid var(--ion-color-primary);
+      padding-bottom: 0.25rem;
     }
     
     .appointment-card {
@@ -401,7 +418,6 @@ export class PatientAppointmentsPage implements OnInit {
     private authService: AuthService,
     private firebaseService: FirebaseService,
     private appointmentService: AppointmentService,
-    private notificationService: NotificationService,
     private localNotificationService: LocalNotificationService,
     private router: Router,
     private actionSheetController: ActionSheetController,
@@ -573,16 +589,38 @@ export class PatientAppointmentsPage implements OnInit {
   }
 
   filterAppointments() {
+    const now = new Date();
+
     if (this.selectedFilter === 'all') {
       this.filteredAppointments = [...this.appointments];
+    } else if (this.selectedFilter === 'upcoming') {
+      // Filter for upcoming appointments (future dates or today's future appointments)
+      this.filteredAppointments = this.appointments.filter(appointment => {
+        const appointmentDateTime = this.getAppointmentDateTime(appointment);
+        return appointmentDateTime > now && ['confirmed', 'pending'].includes(appointment.status.toLowerCase());
+      });
     } else {
       this.filteredAppointments = this.appointments.filter(appointment =>
         appointment.status.toLowerCase() === this.selectedFilter
       );
     }
 
-    // Sort by date (newest first)
-    this.filteredAppointments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Sort by date and time (upcoming appointments: earliest first, others: newest first)
+    if (this.selectedFilter === 'upcoming') {
+      // For upcoming appointments, sort by date and time (earliest first)
+      this.filteredAppointments.sort((a, b) => {
+        const dateTimeA = this.getAppointmentDateTime(a);
+        const dateTimeB = this.getAppointmentDateTime(b);
+        return dateTimeA.getTime() - dateTimeB.getTime();
+      });
+    } else {
+      // For other filters, sort by date and time (newest first)
+      this.filteredAppointments.sort((a, b) => {
+        const dateTimeA = this.getAppointmentDateTime(a);
+        const dateTimeB = this.getAppointmentDateTime(b);
+        return dateTimeB.getTime() - dateTimeA.getTime();
+      });
+    }
   }
 
   async refreshAppointments(event: any) {
@@ -636,6 +674,71 @@ export class PatientAppointmentsPage implements OnInit {
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  private getAppointmentDateTime(appointment: any): Date {
+    // Combine date and time into a single Date object for proper sorting
+    const appointmentDate = new Date(appointment.date);
+    const [time, period] = appointment.time.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+
+    let hour24 = hours;
+    if (period === 'PM' && hours !== 12) {
+      hour24 += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hour24 = 0;
+    }
+
+    appointmentDate.setHours(hour24, minutes, 0, 0);
+    return appointmentDate;
+  }
+
+  getRelativeDate(date: Date): string {
+    const today = new Date();
+    const appointmentDate = new Date(date);
+    const diffTime = appointmentDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return '(Today)';
+    } else if (diffDays === 1) {
+      return '(Tomorrow)';
+    } else if (diffDays === -1) {
+      return '(Yesterday)';
+    } else if (diffDays > 1 && diffDays <= 7) {
+      return `(In ${diffDays} days)`;
+    } else if (diffDays < -1 && diffDays >= -7) {
+      return `(${Math.abs(diffDays)} days ago)`;
+    }
+    return '';
+  }
+
+  shouldShowDateSeparator(appointment: any, index: number): boolean {
+    if (index === 0) return true;
+
+    const currentDate = new Date(appointment.date).toDateString();
+    const previousDate = new Date(this.filteredAppointments[index - 1].date).toDateString();
+
+    return currentDate !== previousDate;
+  }
+
+  formatDateSeparator(date: Date): string {
+    const today = new Date();
+    const appointmentDate = new Date(date);
+    const diffTime = appointmentDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Tomorrow';
+    } else {
+      return appointmentDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
   }
 
   canReschedule(appointment: any): boolean {
@@ -773,14 +876,5 @@ export class PatientAppointmentsPage implements OnInit {
     await toast.present();
   }
 
-  // Test notification method
-  async testNotification() {
-    try {
-      await this.localNotificationService.testNotification();
-      await this.showToast('Test notification sent!', 'success');
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      await this.showToast('Failed to send test notification', 'danger');
-    }
-  }
+
 }

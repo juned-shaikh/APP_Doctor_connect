@@ -43,10 +43,7 @@ export const routes: Routes = [
         path: 'prescriptions',
         loadComponent: () => import('./prescriptions/prescriptions.page').then(m => m.PatientPrescriptionsPage)
       },
-      {
-        path: 'simple-notification-test',
-        loadComponent: () => import('../../components/simple-notification-test.component').then(m => m.SimpleNotificationTestComponent)
-      }
+
     ]
   }
 ];
